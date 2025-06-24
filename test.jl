@@ -4,6 +4,7 @@ using IntervalArithmetic
 
 include("genreach2.jl")
 include("pave.jl")
+include("quantifierproblem.jl")
 
 using ArgParse
 
@@ -33,18 +34,21 @@ parsed_args = parse_commandline()
 n = 1
 p = 3
 @variables x[1:p]
-QE = ([x[1]^2+x[2]^2-x[3]], ["exists", 2], p, n)
+# QE = ([x[1]^2+x[2]^2-x[3]], ["exists", 2, "exists", 3], p, n)
+qe = QuantifierProblem([x[1]^2+x[2]^2-x[3]], [(Exists, 2), (Exists, 3)], p, n)
+# println(qe.quantifiers)
+# println(negation.(qe.quantifiers))
 Z = interval(3, 5)
 intervals = [interval(-3, 3), Z]
 
 X_0 = interval(-10, 10)
 eps = 0.1
-inn, out, delta = pave(QE, intervals, X_0, eps)
-# box = IntervalBox(intervals)
-# is_in = create_is_in(QE, intervals)
-# is_out = create_is_out(QE, intervals)
-# p = make_membershipcell_root(box, is_in, is_out)
-# inn, out, delta = pave(p, QE, X_0, eps)
+# inn, out, delta = pave(qe, intervals, X_0, eps)
+box = IntervalBox(intervals)
+is_in = create_is_in(qe, intervals)
+is_out = create_is_out(qe, intervals)
+p = make_membershipcell_root(box, is_in, is_out)
+inn, out, delta = pave(p, qe, X_0, eps)
 
 print_inn_out_delta(inn, out, delta)
 

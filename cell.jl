@@ -19,8 +19,8 @@ end
 
 #-----------------------------------------------------------------------------------------
 
-Base.@kwdef mutable struct ApproximationCell <: Cell
-    box::IntervalBox
+mutable struct ApproximationCell <: Cell
+    const box::IntervalBox
     children::Vector{ApproximationCell}
     parent::Union{ApproximationCell, Nothing}
     inner
@@ -48,8 +48,8 @@ end
 
 #-----------------------------------------------------------------------------------------
 
-Base.@kwdef mutable struct MembershipCell <: Cell
-    box::IntervalBox
+mutable struct MembershipCell <: Cell
+    const box::IntervalBox
     children::Vector{MembershipCell}
     parent::Union{MembershipCell, Nothing}
     is_in::Function

@@ -2,70 +2,52 @@
 
 using BenchmarkTools
 using IntervalArithmetic
+using Match
 
 include("cell.jl")
-
-function negation(quantifiers)
-    negated_quantifiers = []
-    for i in eachindex(quantifiers)
-        if quantifiers[i] == "forall"
-            push!(negated_quantifiers, "exists")
-        elseif quantifiers[i] == "exists"
-            push!(negated_quantifiers, "forall")
-        else
-            push!(negated_quantifiers, quantifiers[i])
-        end
-    end
-    return negated_quantifiers
-end
+include("quantifierproblem.jl")
 
 """
-    create_is_in(QE, intervals)
+    create_is_in(qe, intervals)
 # Arguments
-- `QE` = (g, quantifiers, p, n) where:
-  - `g` is the formula to be evaluated
-  - `quantifiers` is a list of quantifiers in the formula
-  - `p` is the number of variables in the formula
-  - `n` is the number of intervals
+- `qe` quantier elimination problem QuantifierProblem
 - `intervals` = P_1, P_2, ..., Z
 """
-function create_is_in(QE, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_in(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
-        quantifiers = ["forall", 1, QE[2][1:end-2]..., "exists", QE[3]]
-        R_inner, _ = QEapprox_o0(QE[1], quantifiers, [quantifiers for i=1:QE[4]], QE[3], QE[4], [X, intervals...])
+        quantifiers = [(Forall, 1), qe.quantifiers[1:end-1]..., (Exists, qe.p)]
+        dirty_quantifiers = collect(Iterators.flatten(quantifiedvariable2any.(quantifiers)))
+        R_inner, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals...])
         return R_inner[1] ⊇ interval(0, 0)
     end
 end
 
-function create_is_in(QE, box::IntervalBox)::Function
-    return create_is_in(QE, box.v)
+function create_is_in(qe::QuantifierProblem, box::IntervalBox)::Function
+    return create_is_in(qe, box.v)
 end
 
 """
-    create_is_out(QE, intervals)
+    create_is_out(qe, intervals)
 # Arguments
-- `QE` = (g, quantifiers, p, n) where:
-  - `g` is the formula to be evaluated
-  - `quantifiers` is a list of quantifiers in the formula
-  - `p` is the number of variables in the formula
-  - `n` is the number of intervals
+- `qe` quantifier elimination problem QuantifierProblem
 - `intervals` = P_1, P_2, ..., Z
 """
-function create_is_out(QE, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_out(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     pseudo_infinity = 1000
     eps = 0.1
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
-        quantifiers = ["forall", 1, negation(QE[2][1:end-2])..., "exists", QE[3]]
+        quantifiers = [(Forall, 1), negation.(qe.quantifiers[1:end-1])..., (Exists, qe.p)]
+        dirty_quantifiers = collect(Iterators.flatten(quantifiedvariable2any.(quantifiers)))
         Z_minus = interval(-pseudo_infinity, intervals[end].lo - eps)
         Z_plus = interval(intervals[end].hi + eps, pseudo_infinity)
-        R_inner_minus, _ = QEapprox_o0(QE[1], quantifiers, [quantifiers for i=1:QE[4]], QE[3], QE[4], [X, intervals[1:end-1]..., Z_minus])
-        R_inner_plus, _ = QEapprox_o0(QE[1], quantifiers, [quantifiers for i=1:QE[4]], QE[3], QE[4], [X, intervals[1:end-1]..., Z_plus])
+        R_inner_minus, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_minus])
+        R_inner_plus, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_plus])
         return  R_inner_minus[1] ⊇ interval(0, 0) || R_inner_plus[1] ⊇ interval(0, 0)
     end
 end
 
-function create_is_out(QE, box::IntervalBox)::Function
-    return create_is_out(QE, box.v)
+function create_is_out(qe::QuantifierProblem, box::IntervalBox)::Function
+    return create_is_out(qe, box.v)
 end
 
 function pave(is_in::Function, is_out::Function, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64)::Tuple{Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}} where {T<:Number}
@@ -90,7 +72,7 @@ function pave(is_in::Function, is_out::Function, X_0::IntervalArithmetic.Interva
     return (inn, out, delta)
 end
 
-function pave(p_0::MembershipCell, QE, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64)::Tuple{Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}} where {T<:Number}
+function pave(p_0::MembershipCell, qe::QuantifierProblem, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64)::Tuple{Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}} where {T<:Number}
     inn = []
     out = []
     delta = []
@@ -109,7 +91,7 @@ function pave(p_0::MembershipCell, QE, X_0::IntervalArithmetic.Interval{T}, ϵ::
                 push!(list, (p, X_1))
                 push!(list, (p, X_2))
             else
-                bisect!(p, QE)
+                bisect!(p, qe)
                 push!(list, (p, X))
             end
         end
@@ -117,53 +99,45 @@ function pave(p_0::MembershipCell, QE, X_0::IntervalArithmetic.Interval{T}, ϵ::
     return (inn, out, delta)
 end
 
-# function get_quantifier_from_QE(QE::Tuple{Vector{Num}, Vector{Any}, Int64, Int64}, dim::Int)
-function get_quantifier_from_QE(QE, dim::Int)
-    i = 2
-    while QE[2][i] != dim
-        i += 2
-    end
-    return QE[2][i-1]
-end
-
-function bisect!(cell::MembershipCell, QE)
+function bisect!(cell::MembershipCell, qe::QuantifierProblem)
     if isleaf(cell)
         box_1, box_2 = bisect(cell.box, 0.5)
         
-        is_in_1 = create_is_in(QE, box_1)
-        is_out_1 = create_is_out(QE, box_1)
+        is_in_1 = create_is_in(qe, box_1)
+        is_out_1 = create_is_out(qe, box_1)
         cell_1 = make_membershipcell_leaf(box_1, is_in_1, is_out_1, cell)
         
-        is_in_2 = create_is_in(QE, box_2)
-        is_out_2 = create_is_out(QE, box_2)
+        is_in_2 = create_is_in(qe, box_2)
+        is_out_2 = create_is_out(qe, box_2)
         cell_2 = make_membershipcell_leaf(box_2, is_in_2, is_out_2, cell)
         
         dim = 1
         while box_1[dim] == box_2[dim]
             dim += 1
         end
-        quantifier = get_quantifier_from_QE(QE, dim + 1)
-        if quantifier == "exists"
+        q = quantifier(qe, dim + 1)
+        if q == Exists
             cell.is_in = X -> cell_1.is_in(X) || cell_2.is_in(X)
             cell.is_out = X -> cell_1.is_out(X) && cell_2.is_out(X)
-        else
+        elseif q == Forall
             cell.is_in = X -> cell_1.is_in(X) && cell_2.is_in(X)
             cell.is_out = X -> cell_1.is_out(X) || cell_2.is_out(X)
+        else
+            error("Unknown quantifier: $q")
         end
     else
         heights = height.(cell.children)
         if heights[1] > heights[2]
-            bisect!(cell.children[2], QE)
+            bisect!(cell.children[2], qe)
         else
-            bisect!(cell.children[1], QE)
+            bisect!(cell.children[1], qe)
         end
     end
 end
 
-# function pave(QE::Tuple{Vector{Num}, Vector{Any}, Int64, Int64}, intervals::Vector{IntervalArithmetic.Interval{T}}, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64) where {T<:Number}
-function pave(QE, intervals::Vector{IntervalArithmetic.Interval{T}}, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64) where {T<:Number}
-    is_in = create_is_in(QE, intervals)
-    is_out = create_is_out(QE, intervals)
+function pave(qe::QuantifierProblem, intervals::Vector{IntervalArithmetic.Interval{T}}, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64) where {T<:Number}
+    is_in = create_is_in(qe, intervals)
+    is_out = create_is_out(qe, intervals)
     return pave(is_in, is_out, X_0, ϵ)
 end
 
@@ -196,7 +170,7 @@ function merge_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}) wher
 end
 
 function print_inn_out_delta(inn::Vector{IntervalArithmetic.Interval{T}}, out::Vector{IntervalArithmetic.Interval{T}}, delta::Vector{IntervalArithmetic.Interval{T}}) where {T<:Number}
-    println("Union of elements of inn: ", merge_intervals(inn))
-    println("Union of elements of out: ", merge_intervals(out))
-    println("Union of elements of delta: ", merge_intervals(delta))
+    Base.println("Union of elements of inn: ", merge_intervals(inn))
+    Base.println("Union of elements of out: ", merge_intervals(out))
+    Base.println("Union of elements of delta: ", merge_intervals(delta))
 end
