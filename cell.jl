@@ -56,7 +56,7 @@ Base.@kwdef mutable struct MembershipCell <: Cell
     is_out:: Function
 end
 
-function make_membershipcell_root(box::IntervalBox, is_in, is_out, intervals)
+function make_membershipcell_root(box::IntervalBox, is_in, is_out)
     return MembershipCell(box, [], nothing, is_in, is_out)
 end
 
@@ -64,4 +64,12 @@ function make_membershipcell_leaf(box::IntervalBox, is_in, is_out, parent::Cell)
     cell = MembershipCell(box, [], parent, is_in, is_out)
     push!(parent.children, cell)
     return cell
+end
+
+function diamm(cell::MembershipCell)
+    if isleaf(cell)
+        return diam(cell.box)
+    else
+        return maximum(diamm.(cell.children))
+    end
 end

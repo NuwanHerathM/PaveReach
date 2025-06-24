@@ -25,7 +25,7 @@ parsed_args = parse_commandline()
 n = 1
 p = 3
 @variables x[1:p]
-QE = ([x[1]+x[2]-x[3]],["exists", 2],p,n)
+QE = ([x[1]+x[2]-x[3]],["exists", 2, "exists", 3],p,n)
 Z = interval(3,4)
 intervals = [interval(2,8), Z]
 
@@ -39,7 +39,12 @@ intervals = [interval(2,8), Z]
 
 X_0 = interval(-10, 10)
 eps = 0.1
-inn, out, delta = pave(QE, intervals, X_0, eps)
+# inn, out, delta = pave(QE, intervals, X_0, eps)
+box = IntervalBox(intervals)
+is_in = create_is_in(QE, intervals)
+is_out = create_is_out(QE, intervals)
+p = make_membershipcell_root(box, is_in, is_out)
+inn, out, delta = pave(p, QE, X_0, eps)
 
 print_inn_out_delta(inn, out, delta)
 

@@ -29,9 +29,9 @@ end
   - `n` is the number of intervals
 - `intervals` = P_1, P_2, ..., Z
 """
-function create_is_in(QE, intervals::Vector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_in(QE, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
-        quantifiers = ["forall", 1, QE[2]..., "exists", QE[3]]
+        quantifiers = ["forall", 1, QE[2][1:end-2]..., "exists", QE[3]]
         R_inner, _ = QEapprox_o0(QE[1], quantifiers, [quantifiers for i=1:QE[4]], QE[3], QE[4], [X, intervals...])
         return R_inner[1] ⊇ interval(0, 0)
     end
@@ -51,11 +51,11 @@ end
   - `n` is the number of intervals
 - `intervals` = P_1, P_2, ..., Z
 """
-function create_is_out(QE, intervals::Vector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_out(QE, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     pseudo_infinity = 1000
     eps = 0.1
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
-        quantifiers = ["forall", 1, negation(QE[2])..., "exists", 3]
+        quantifiers = ["forall", 1, negation(QE[2][1:end-2])..., "exists", QE[3]]
         Z_minus = interval(-pseudo_infinity, intervals[end].lo - eps)
         Z_plus = interval(intervals[end].hi + eps, pseudo_infinity)
         R_inner_minus, _ = QEapprox_o0(QE[1], quantifiers, [quantifiers for i=1:QE[4]], QE[3], QE[4], [X, intervals[1:end-1]..., Z_minus])
@@ -104,7 +104,7 @@ function pave(p_0::MembershipCell, QE, X_0::IntervalArithmetic.Interval{T}, ϵ::
         elseif diam(X) < ϵ
             push!(delta, X)
         else
-            if diam(X) > diam(p.box)
+            if diam(X) > diamm(p) || diamm(p) < 10 * ϵ
                 X_1, X_2 = bisect(X, 0.5)
                 push!(list, (p, X_1))
                 push!(list, (p, X_2))
@@ -117,7 +117,8 @@ function pave(p_0::MembershipCell, QE, X_0::IntervalArithmetic.Interval{T}, ϵ::
     return (inn, out, delta)
 end
 
-function get_quantifier_from_QE(QE::Tuple{Vector{Num}, Vector{Any}, Int64, Int64}, dim::Int)
+# function get_quantifier_from_QE(QE::Tuple{Vector{Num}, Vector{Any}, Int64, Int64}, dim::Int)
+function get_quantifier_from_QE(QE, dim::Int)
     i = 2
     while QE[2][i] != dim
         i += 2
@@ -127,7 +128,7 @@ end
 
 function bisect!(cell::MembershipCell, QE)
     if isleaf(cell)
-        box_1, box_2 = bisect(p.box, 0.5)
+        box_1, box_2 = bisect(cell.box, 0.5)
         
         is_in_1 = create_is_in(QE, box_1)
         is_out_1 = create_is_out(QE, box_1)
@@ -141,13 +142,13 @@ function bisect!(cell::MembershipCell, QE)
         while box_1[dim] == box_2[dim]
             dim += 1
         end
-        quantifier = get_quantifier_from_QE(QE, dim)
+        quantifier = get_quantifier_from_QE(QE, dim + 1)
         if quantifier == "exists"
             cell.is_in = X -> cell_1.is_in(X) || cell_2.is_in(X)
-            cell.is_out = X -> cell_1.is_out(X) || cell_2.is_out(X)
+            cell.is_out = X -> cell_1.is_out(X) && cell_2.is_out(X)
         else
-            cell.is_in = cell_1.is_in(X) && cell_2.is_in(X)
-            cell.is_out = is_outcell_1.is_out(X) && cell_2.is_out(X)
+            cell.is_in = X -> cell_1.is_in(X) && cell_2.is_in(X)
+            cell.is_out = X -> cell_1.is_out(X) || cell_2.is_out(X)
         end
     else
         heights = height.(cell.children)
@@ -159,7 +160,8 @@ function bisect!(cell::MembershipCell, QE)
     end
 end
 
-function pave(QE::Tuple{Vector{Num}, Vector{Any}, Int64, Int64}, intervals::Vector{IntervalArithmetic.Interval{T}}, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64) where {T<:Number}
+# function pave(QE::Tuple{Vector{Num}, Vector{Any}, Int64, Int64}, intervals::Vector{IntervalArithmetic.Interval{T}}, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64) where {T<:Number}
+function pave(QE, intervals::Vector{IntervalArithmetic.Interval{T}}, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64) where {T<:Number}
     is_in = create_is_in(QE, intervals)
     is_out = create_is_out(QE, intervals)
     return pave(is_in, is_out, X_0, ϵ)
