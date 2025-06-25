@@ -56,13 +56,17 @@ function negation(qv::QuantifiedVariable)
     end
 end
 
-function quantifiedvariable2any(qv::QuantifiedVariable)
-    quantifier, index = qv
-    @match quantifier begin
-        $Forall => return ("forall", index)
-        $Exists => return ("exists", index)
-        _ => error("Unknown quantifier: $quantifier")
+function quantifiedvariables2dirtyvariables(qvs::Vector{QuantifiedVariable})
+    dirty_variables = Any[]
+    for qv in qvs
+        quantifier, index = qv
+        @match quantifier begin
+            $Forall => push!(dirty_variables, "forall", index)
+            $Exists => push!(dirty_variables, "exists", index)
+            _ => error("Unknown quantifier: $quantifier")
+        end
     end
+    return dirty_variables
 end
 
 #----------------------------------------------------------------------------------------

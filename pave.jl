@@ -16,7 +16,7 @@ include("quantifierproblem.jl")
 function create_is_in(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
         quantifiers = [(Forall, 1), qe.quantifiers[1:end-1]..., (Exists, qe.p)]
-        dirty_quantifiers = collect(Iterators.flatten(quantifiedvariable2any.(quantifiers)))
+        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         R_inner, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals...])
         return R_inner[1] ⊇ interval(0, 0)
     end
@@ -37,7 +37,7 @@ function create_is_out(qe::QuantifierProblem, intervals::AbstractVector{Interval
     eps = 0.1
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
         quantifiers = [(Forall, 1), negation.(qe.quantifiers[1:end-1])..., (Exists, qe.p)]
-        dirty_quantifiers = collect(Iterators.flatten(quantifiedvariable2any.(quantifiers)))
+        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         Z_minus = interval(-pseudo_infinity, intervals[end].lo - eps)
         Z_plus = interval(intervals[end].hi + eps, pseudo_infinity)
         R_inner_minus, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_minus])
@@ -83,10 +83,10 @@ function pave(p_0::MembershipCell, qe::QuantifierProblem, X_0::IntervalArithmeti
             push!(inn, X)
         elseif p.is_out(X)
             push!(out, X)
-        elseif diam(X) < ϵ
+        elseif IntervalArithmetic.diam(X) < ϵ
             push!(delta, X)
         else
-            if diam(X) > diamm(p) || diamm(p) < 10 * ϵ
+            if IntervalArithmetic.diam(X) > diam(p) || diam(p) < 10 * ϵ
                 X_1, X_2 = bisect(X, 0.5)
                 push!(list, (p, X_1))
                 push!(list, (p, X_2))
@@ -115,7 +115,8 @@ function bisect!(cell::MembershipCell, qe::QuantifierProblem)
         while box_1[dim] == box_2[dim]
             dim += 1
         end
-        q = quantifier(qe, dim + 1)
+        dim_X = 1
+        q = quantifier(qe, dim + dim_X)
         if q == Exists
             cell.is_in = X -> cell_1.is_in(X) || cell_2.is_in(X)
             cell.is_out = X -> cell_1.is_out(X) && cell_2.is_out(X)

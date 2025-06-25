@@ -66,10 +66,10 @@ function make_membershipcell_leaf(box::IntervalBox, is_in, is_out, parent::Cell)
     return cell
 end
 
-function diamm(cell::MembershipCell)
+function diam(cell::MembershipCell)
     if isleaf(cell)
-        return diam(cell.box)
+        return IntervalArithmetic.diam(cell.box)
     else
-        return maximum(diamm.(cell.children))
+        return maximum(diam.(cell.children))
     end
 end
