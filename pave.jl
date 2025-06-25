@@ -27,19 +27,19 @@ function create_is_in(qe::QuantifierProblem, box::IntervalBox)::Function
 end
 
 """
-    create_is_out(qe, intervals)
+    create_is_out(qe, intervals, [pseudo_infinity, ϵ])
 # Arguments
 - `qe` quantifier elimination problem QuantifierProblem
 - `intervals` = P_1, P_2, ..., Z
+- `pseudo_infinity` a large number to represent infinity in the intervals
+- `ϵ` a small number to create a margin around the interval Z for its complement
 """
-function create_is_out(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
-    pseudo_infinity = 1000
-    eps = 0.1
+function create_is_out(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, pseudo_infinity::Int=1000, ϵ::Float64=0.1)::Function where {T<:Number}
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
         quantifiers = [(Forall, 1), negation.(qe.quantifiers[1:end-1])..., (Exists, qe.p)]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        Z_minus = interval(-pseudo_infinity, intervals[end].lo - eps)
-        Z_plus = interval(intervals[end].hi + eps, pseudo_infinity)
+        Z_minus = interval(-pseudo_infinity, intervals[end].lo - ϵ)
+        Z_plus = interval(intervals[end].hi + ϵ, pseudo_infinity)
         R_inner_minus, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_minus])
         R_inner_plus, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_plus])
         return  R_inner_minus[1] ⊇ interval(0, 0) || R_inner_plus[1] ⊇ interval(0, 0)
@@ -72,7 +72,17 @@ function pave(is_in::Function, is_out::Function, X_0::IntervalArithmetic.Interva
     return (inn, out, delta)
 end
 
-function pave(p_0::MembershipCell, qe::QuantifierProblem, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64)::Tuple{Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}} where {T<:Number}
+"""
+    pave(p_0, qe, X_0, ϵ, [ratio, precision_factor])
+# Arguments
+- `p_0` initial p
+- `qe` quantifier elimination problem
+- `X_0` initial interval
+- `ϵ` precision threshold for X: if diam(X) < ϵ then X is not split
+- `ratio` ratio to determine when to split the cell: if diam(X) / diam(p) <= ratio then split p
+- `precision_factor` factor to get the precision threshold for p: if diam(p) < precision_factor * ϵ then p is not split
+"""
+function pave(p_0::MembershipCell, qe::QuantifierProblem, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10)::Tuple{Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}} where {T<:Number}
     inn = []
     out = []
     delta = []
@@ -86,7 +96,7 @@ function pave(p_0::MembershipCell, qe::QuantifierProblem, X_0::IntervalArithmeti
         elseif IntervalArithmetic.diam(X) < ϵ
             push!(delta, X)
         else
-            if IntervalArithmetic.diam(X) > diam(p) || diam(p) < 10 * ϵ
+            if IntervalArithmetic.diam(X) > ratio * diam(p) || diam(p) < precision_factor * ϵ
                 X_1, X_2 = bisect(X, 0.5)
                 push!(list, (p, X_1))
                 push!(list, (p, X_2))
