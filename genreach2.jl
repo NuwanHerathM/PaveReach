@@ -259,7 +259,21 @@ function IZon(lin, k, n)
   return LazySets.Interval(-abs(lin[1,k]),abs(lin[1,k]))   
 end
 
-function QEapprox_o0(g, quantifiers, q, p, n, input)
+function build_function_f_Df(g_num::Vector{Num}, n::Int)::Tuple{Vector{Function}, Vector{Function}}
+  g_fun = []
+  Dg_fun = []
+  for j in 1:n
+    g_expr = build_function(g_num[j], [x[i] for i=1:p])
+    push!(g_fun, eval(g_expr))
+    
+    Dg = Symbolics.jacobian([g_num[j]], [x[i] for i=1:p])
+    Dg_expr = build_function(Dg, [x[i] for i=1:p])
+    push!(Dg_fun, eval(Dg_expr[1]))
+  end
+  return g_fun, Dg_fun
+end
+
+function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
   global out = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
   global inn = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
 
@@ -267,14 +281,8 @@ function QEapprox_o0(g, quantifiers, q, p, n, input)
   input_center = [mid(input[i]) for i=1:p]
    
   for j in 1:n
-     g_expr = build_function(g[j], [x[i] for i=1:p])
-     my_g = eval(g_expr)
-     c = Base.invokelatest(my_g,input_center)
-
-     Dg = Symbolics.jacobian([g[j]], [x[i] for i=1:p])
-     Dg_expr = build_function(Dg, [x[i] for i=1:p])
-     my_Dg = eval(Dg_expr[1])
-     range_Dg = Base.invokelatest(my_Dg,input)
+     c = Base.invokelatest(g_fun[j],input_center)
+     range_Dg = Base.invokelatest(Dg_fun[j],input)
    
      outer = interval(c,c)
 

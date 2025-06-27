@@ -72,13 +72,14 @@ end
 #----------------------------------------------------------------------------------------
 
 struct QuantifierProblem
-    fun::Vector{Num}
+    f::Vector{Function}
+    Df::Vector{Function}
     quantifiers::Vector{QuantifiedVariable}
     p::Int
     n::Int
 end
 
-function QuantifierProblem(fun::Vector{Num}, quantifiers::Vector{Any}, p::Int, n::Int)
+function QuantifierProblem(f, Df, quantifiers::Vector{Any}, p::Int, n::Int)
     quantifier_variables = QuantifiedVariable[]
     for i in 1:2:length(quantifiers)
         if quantifiers[i] == "forall" && quantifiers[i+1] isa Int
@@ -91,7 +92,7 @@ function QuantifierProblem(fun::Vector{Num}, quantifiers::Vector{Any}, p::Int, n
             error("""Invalid quantifier: quantifier[$(i+1)], "$(quantifiers[i+1])", should be an integer.""")
         end
     end
-    return QuantifierProblem(fun, quantifier_variables, p, n)
+    return QuantifierProblem(f, Df, quantifier_variables, p, n)
 end
 
 function quantifier(qe::QuantifierProblem, dim::Int)::Quantifier

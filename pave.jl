@@ -17,7 +17,7 @@ function create_is_in(qe::QuantifierProblem, intervals::AbstractVector{IntervalA
     return function(X::IntervalArithmetic.Interval{T}) where {T<:Number}
         quantifiers = [(Forall, 1), qe.quantifiers[1:end-1]..., (Exists, qe.p)]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        R_inner, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals...])
+        R_inner, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals...])
         return R_inner[1] ⊇ interval(0, 0)
     end
 end
@@ -40,8 +40,8 @@ function create_is_out(qe::QuantifierProblem, intervals::AbstractVector{Interval
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         Z_minus = interval(-pseudo_infinity, intervals[end].lo - ϵ)
         Z_plus = interval(intervals[end].hi + ϵ, pseudo_infinity)
-        R_inner_minus, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_minus])
-        R_inner_plus, _ = QEapprox_o0(qe.fun, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_plus])
+        R_inner_minus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_minus])
+        R_inner_plus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals[1:end-1]..., Z_plus])
         return  R_inner_minus[1] ⊇ interval(0, 0) || R_inner_plus[1] ⊇ interval(0, 0)
     end
 end
@@ -61,7 +61,7 @@ function pave(is_in::Function, is_out::Function, X_0::IntervalArithmetic.Interva
             push!(inn, X)
         elseif is_out(X)
             push!(out, X)
-        elseif diam(X) < ϵ
+        elseif IntervalArithmetic.diam(X) < ϵ
             push!(delta, X)
         else
             X_1, X_2 = bisect(X, 0.5)
