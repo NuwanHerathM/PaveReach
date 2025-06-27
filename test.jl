@@ -8,6 +8,8 @@ include("quantifierproblem.jl")
 
 using ArgParse
 
+using Match
+
 function parse_commandline()
     s = ArgParseSettings()
 
@@ -22,28 +24,60 @@ end
 
 parsed_args = parse_commandline()
 
-# simple example
-# n = 1
-# p = 3
-# @variables x[1:p]
-# QE = ([x[1]+x[2]-x[3]],["exists", 2, "exists", 3],p,n)
-# Z = interval(3,4)
-# intervals = [interval(2,8), Z]
+Base.println("Choose an example to run:")
+Base.println("\t1. Simple example")
+Base.println("\t\t x_1 | ∃ x_2 ∈ [2, 8], x_1 + x_2 ∈ [3, 4]")
+Base.println("\t2. Circle example")
+Base.println("\t\t x_1 | ∃ x_2 ∈ [-3, 3], x_1^2 + x_2^2 ∈ [3, 5]")
+Base.println("\t3. Jaulin example")
+Base.println("\t\t x_1 | ∀ x_3 ∈ [6, 8], ∃ x_2 ∈ [2, 8], x_1^2 + x_2^2 + 2*x_1*x_2 - 20*x_1 - 20*x_2 + 100 - x_3 ∈ [0, 0]")
+Base.print("Enter your choice: ")
+choice = readline()
 
-# circle example
-n = 1
-p = 3
-@variables x[1:p]
-# QE = ([x[1]^2+x[2]^2-x[3]], ["exists", 2, "exists", 3], p, n)
-f_num = [x[1]^2+x[2]^2-x[3]]
-f_fun, Df_fun = build_function_f_Df(f_num, n)
-qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 2), (Exists, 3)], p, n)
-# println(qe.quantifiers)
-# println(negation.(qe.quantifiers))
-Z = interval(3, 5)
-intervals = [interval(-3, 3), Z]
+# global qe, intervals
+@match choice begin
+    "1" => begin
+        # simple example
+        n = 1
+        p = 3
+        @variables x[1:p]
+        f_num = [x[1]+x[2]-x[3]]
+        f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+        global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 2), (Exists, 3)], p, n)
+        global X_0 = interval(-10, 10)
+        Z = interval(3, 4)
+        global intervals = [interval(2, 8), Z]
+    end
+    "2" => begin
+        # circle example
+        n = 1
+        p = 3
+        @variables x[1:p]
+        f_num = [x[1]^2+x[2]^2-x[3]]
+        f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+        global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 2), (Exists, 3)], p, n)
+        global X_0 = interval(-10, 10)
+        Z = interval(3, 5)
+        global intervals = [interval(-3, 3), Z]
+    end
+    "3" => begin
+        # Jaulin example
+        n = 1
+        p = 4
+        @variables x[1:p]
+        f_num = [x[1]^2+x[2]^2+2*x[1]*x[2]-20*x[1]-20x[2]+100-x[3]-x[4]]
+        f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 2), (Exists, 4)], p, n)
+        global X_0 = interval(0, 6)
+        # global X_0 = interval(0.8, 0.9)
+        # global X_0 = interval(0.4, 0.45)
+        Z = interval(0, 0)
+        global intervals = [interval(2, 8), interval(6, 8), Z]
+    end
+    _ => error("Invalid choice")
+end
 
-X_0 = interval(-10, 10)
+
 eps = 0.1
 @time begin
     # inn, out, delta = pave(qe, intervals, X_0, eps)

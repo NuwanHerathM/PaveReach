@@ -259,18 +259,18 @@ function IZon(lin, k, n)
   return LazySets.Interval(-abs(lin[1,k]),abs(lin[1,k]))   
 end
 
-function build_function_f_Df(g_num::Vector{Num}, n::Int)::Tuple{Vector{Function}, Vector{Function}}
-  g_fun = []
-  Dg_fun = []
+function build_function_f_Df(f_num::Vector{Num}, x, n::Int, p::Int)
+  f_fun = Function[]
+  Df_fun = Function[]
   for j in 1:n
-    g_expr = build_function(g_num[j], [x[i] for i=1:p])
-    push!(g_fun, eval(g_expr))
+    f_expr = build_function(f_num[j], [x[i] for i=1:p])
+    push!(f_fun, eval(f_expr))
     
-    Dg = Symbolics.jacobian([g_num[j]], [x[i] for i=1:p])
-    Dg_expr = build_function(Dg, [x[i] for i=1:p])
-    push!(Dg_fun, eval(Dg_expr[1]))
+    Df = Symbolics.jacobian([f_num[j]], [x[i] for i=1:p])
+    Df_expr = build_function(Df, [x[i] for i=1:p])
+    push!(Df_fun, eval(Df_expr[1]))
   end
-  return g_fun, Dg_fun
+  return f_fun, Df_fun
 end
 
 function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)

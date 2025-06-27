@@ -9,11 +9,11 @@ end
 
 QuantifiedVariable = Tuple{Quantifier, Int}
 
-function quantifier(qv::QuantifiedVariable)::Quantifier
+function quantifier(qv::QuantifiedVariable)
     return qv[1]
 end
 
-function index(qv::QuantifiedVariable)::Int
+function index(qv::QuantifiedVariable)
     return qv[2]
 end
 
@@ -95,7 +95,7 @@ function QuantifierProblem(f, Df, quantifiers::Vector{Any}, p::Int, n::Int)
     return QuantifierProblem(f, Df, quantifier_variables, p, n)
 end
 
-function quantifier(qe::QuantifierProblem, dim::Int)::Quantifier
+function quantifier(qe::QuantifierProblem, dim::Int)
     i = 1
     while index(qe.quantifiers[i]) != dim
         i += 1
