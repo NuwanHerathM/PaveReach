@@ -17,36 +17,6 @@ function index(qv::QuantifiedVariable)
     return qv[2]
 end
 
-function print(qv::QuantifiedVariable)
-    quantifier, index = qv
-    @match quantifier begin
-        $Forall => Base.print("∀", index)
-        $Exists => Base.print("∃", index)
-        _ => error("Unknown quantifier: $quantifier")
-    end
-end
-
-function println(qv::QuantifiedVariable)
-    print(qv)
-    Base.println()
-end
-
-function print(qvs::Vector{QuantifiedVariable})
-    Base.print("[")
-    for (i, qv) in enumerate(qvs)
-        print(qv)
-        if i < length(qvs)
-            Base.print(", ")
-        end
-    end
-    Base.print("]")
-end
-
-function println(qvs::Vector{QuantifiedVariable})
-    print(qvs)
-    Base.println()
-end
-
 function negation(qv::QuantifiedVariable)
     quantifier, index = qv
     @match quantifier begin

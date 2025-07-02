@@ -17,6 +17,9 @@ function parse_commandline()
         "--display", "-d"
             help = "display the results in a plot"
             action = :store_true
+        "--example"
+            help = "choose an example to run"
+            arg_type = Int
     end
 
     return parse_args(s)
@@ -24,19 +27,23 @@ end
 
 parsed_args = parse_commandline()
 
-Base.println("Choose an example to run:")
-Base.println("\t1. Simple example")
-Base.println("\t\t x_1 | ∃ x_2 ∈ [2, 8], x_1 + x_2 ∈ [3, 4]")
-Base.println("\t2. Circle example")
-Base.println("\t\t x_1 | ∃ x_2 ∈ [-3, 3], x_1^2 + x_2^2 ∈ [3, 5]")
-Base.println("\t3. Jaulin example")
-Base.println("\t\t x_1 | ∀ x_3 ∈ [6, 8], ∃ x_2 ∈ [2, 8], x_1^2 + x_2^2 + 2*x_1*x_2 - 20*x_1 - 20*x_2 + 100 - x_3 ∈ [0, 0]")
-Base.print("Enter your choice: ")
-choice = readline()
+if !isnothing(parsed_args["example"])
+    global choice = parsed_args["example"]
+else
+    Base.println("Choose an example to run:")
+    Base.println("\t1. Simple example")
+    Base.println("\t\t x_1 | ∃ x_2 ∈ [2, 8], x_1 + x_2 ∈ [3, 4]")
+    Base.println("\t2. Circle example")
+    Base.println("\t\t x_1 | ∃ x_2 ∈ [-3, 3], x_1^2 + x_2^2 ∈ [3, 5]")
+    Base.println("\t3. HSVJ05 example")
+    Base.println("\t\t x_1 | ∀ x_3 ∈ [6, 8], ∃ x_2 ∈ [2, 8], x_1^2 + x_2^2 + 2*x_1*x_2 - 20*x_1 - 20*x_2 + 100 - x_3 ∈ [0, 0]")
+    Base.print("Enter your choice: ")
+    global choice = parse(Int, readline())
+end
 
 # global qe, intervals
 @match choice begin
-    "1" => begin
+    1 => begin
         # simple example
         n = 1
         p = 3
@@ -48,7 +55,7 @@ choice = readline()
         Z = interval(3, 4)
         global intervals = [interval(2, 8), Z]
     end
-    "2" => begin
+    2 => begin
         # circle example
         n = 1
         p = 3
@@ -60,8 +67,8 @@ choice = readline()
         Z = interval(3, 5)
         global intervals = [interval(-3, 3), Z]
     end
-    "3" => begin
-        # Jaulin example
+    3 => begin
+        # HSVJ05 example (Quantified set inversion algorithm with applications to control, 2005)
         n = 1
         p = 4
         @variables x[1:p]
@@ -69,23 +76,21 @@ choice = readline()
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
         global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 2), (Exists, 4)], p, n)
         global X_0 = interval(0, 6)
-        # global X_0 = interval(0.8, 0.9)
-        # global X_0 = interval(0.4, 0.45)
+        # global X_0 = interval(3.75, 3.9375)
         Z = interval(0, 0)
         global intervals = [interval(2, 8), interval(6, 8), Z]
     end
     _ => error("Invalid choice")
 end
 
-
 eps = 0.1
-@time begin
-    # inn, out, delta = pave(qe, intervals, X_0, eps)
+@btime begin
+    # global inn, out, delta = pave(qe, intervals, X_0, eps)
     box = IntervalBox(intervals)
     is_in = create_is_in(qe, intervals)
     is_out = create_is_out(qe, intervals)
     p = make_membershipcell_root(box, is_in, is_out)
-    inn, out, delta = pave(p, qe, X_0, eps)
+    global inn, out, delta = pave(p, qe, X_0, eps)
 end
 
 print_inn_out_delta(inn, out, delta)

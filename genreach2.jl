@@ -149,12 +149,12 @@ end
   # convenience function returning the inner-approximated interval for the contribution of xi, i between 1 and dim input, to function f for which we give the Jacobian Jf
   # try catch because the Jacobian of a linear function gives Float64 and not Interval
     try
-      Jl = abs(range_Jf[i]).lo
-      return Jl*interval(-1, 1)*radii[i]
+      Jl = range_Jf[i].lo
+      return abs(Jl)*interval(-1, 1)*radii[i]
       catch u
         # println(u)
         Jl = range_Jf[i]
-        res = Jl*interval(-1, 1)
+        res = abs(Jl)*interval(-1, 1)
         return res*radii[i]
     end
   end
