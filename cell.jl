@@ -1,25 +1,101 @@
 using AbstractTrees
 
-abstract type Cell end
+abstract type AbstractCell end
 
-AbstractTrees.children(cell::Cell) = cell.children
-AbstractTrees.ParentLinks(::Cell) = AbstractTrees.StoredParents()
-AbstractTrees.parent(cell::Cell) = cell.parent
-AbstractTrees.nodevalue(cell::Cell) = cell.box
-isleaf(cell::Cell) = isempty(cell.children)
-AbstractTrees.isroot(cell::Cell) = isnothing(cell.parent)
+struct Cell <: AbstractCell
+    interval::IntervalArithmetic.Interval{T} where T<:Number
+    children::Vector{AbstractCell}
+    parent::AbstractCell
+end
 
-function height(cell::Cell)
-    if isleaf(cell)
-        return 0
+struct CellStart <: AbstractCell
+    children::Vector{AbstractCell}
+end
+
+struct CellEnd <: AbstractCell
+    interval::IntervalArithmetic.Interval{T} where T<:Number
+    parent::AbstractCell
+    is_in::Function
+    is_out::Function
+end
+
+AbstractTrees.children(cell::AbstractCell) = isa(cell, CellEnd) ? [] : cell.children
+AbstractTrees.parent(cell::AbstractCell) = isa(cell, CellStart) ? nothing : cell.parent
+AbstractTrees.nodevalue(cell::AbstractCell) = isa(cell, CellStart) ? emptyinterval() : cell.interval
+isleaf(cell::AbstractCell) = isa(cell, CellEnd) || (isroot(cell) && isempty(cell.children))
+AbstractTrees.isroot(cell::AbstractCell) = isa(cell, CellStart)
+
+function Cell(interval::IntervalArithmetic.Interval{T}, parent::Union{CellStart, Cell}) where T<:Number
+    return Cell(interval, [], parent)
+end
+
+function CellStart()
+    return CellStart([])
+end
+
+import Base: push!
+
+function push!(cell::CellStart, intervals, is_in, is_out)
+    return push!(cell, intervals, 1, is_in, is_out)
+end
+
+function push!(cell::AbstractCell, intervals, i, is_in, is_out)
+    if i > length(intervals)
+        return
+    end
+
+    pos = findfirst(isequal(intervals[i]), [child.interval for child in cell.children])
+    if !isnothing(pos)
+        push!(cell.children[pos], intervals, i+1, is_in, is_out)
     else
-        return 1 + maximum(height(child) for child in cell.children)
+        child = make_paving(intervals, i, cell, is_in, is_out)
+        push!(cell.children, child)
+    end
+end
+
+function remove!(cell::AbstractCell)
+    if isroot(cell)
+        return
+    end
+
+    parent = cell.parent
+    filter!(child -> child !== cell, parent.children)
+
+    if isempty(parent.children)
+        remove!(parent)
+    end
+end
+
+function remove!(cell::CellEnd, intervals)
+    if isempty(intervals)
+        remove!(cell)
+    end
+end
+
+function remove!(cell::Union{CellStart, Cell}, intervals)
+    if isempty(intervals)
+        return
+    end
+    
+    pos = findfirst(isequal(intervals[begin]), [child.interval for child in cell.children])
+    if !isnothing(pos)
+        remove!(cell.children[pos], intervals[2:end])
+    end
+end
+
+function diam(cell::AbstractCell)
+    if isleaf(cell)
+        return IntervalArithmetic.diam(cell.interval)
+    elseif isroot(cell)
+        return maximum(diam.(cell.children))
+    else
+        return maximum([IntervalArithmetic.diam(cell.interval), diam.(cell.children)...])
     end
 end
 
 #-----------------------------------------------------------------------------------------
 
-mutable struct ApproximationCell <: Cell
+mutable struct ApproximationCell
     const box::IntervalBox
     children::Vector{ApproximationCell}
     parent::Union{ApproximationCell, Nothing}
@@ -48,28 +124,4 @@ end
 
 #-----------------------------------------------------------------------------------------
 
-mutable struct MembershipCell <: Cell
-    const box::IntervalBox
-    children::Vector{MembershipCell}
-    parent::Union{MembershipCell, Nothing}
-    is_in::Function
-    is_out:: Function
-end
 
-function make_membershipcell_root(box::IntervalBox, is_in, is_out)
-    return MembershipCell(box, [], nothing, is_in, is_out)
-end
-
-function make_membershipcell_leaf(box::IntervalBox, is_in, is_out, parent::Cell)
-    cell = MembershipCell(box, [], parent, is_in, is_out)
-    push!(parent.children, cell)
-    return cell
-end
-
-function diam(cell::MembershipCell)
-    if isleaf(cell)
-        return IntervalArithmetic.diam(cell.box)
-    else
-        return maximum(diam.(cell.children))
-    end
-end

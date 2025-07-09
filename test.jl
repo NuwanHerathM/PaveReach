@@ -77,6 +77,8 @@ end
         global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 2), (Exists, 4)], p, n)
         global X_0 = interval(0, 6)
         # global X_0 = interval(3.75, 3.9375)
+        # global X_0 = interval(3.75, 4) # is inside
+        # global X_0 = interval(3.5, 4) # is not inside but should :(
         Z = interval(0, 0)
         global intervals = [interval(2, 8), interval(6, 8), Z]
     end
@@ -86,12 +88,116 @@ end
 eps = 0.1
 @btime begin
     # global inn, out, delta = pave(qe, intervals, X_0, eps)
-    box = IntervalBox(intervals)
-    is_in = create_is_in(qe, intervals)
-    is_out = create_is_out(qe, intervals)
-    p = make_membershipcell_root(box, is_in, is_out)
-    global inn, out, delta = pave(p, qe, X_0, eps)
+    # box = IntervalBox(intervals)
+    # is_in = create_is_in(qe, intervals)
+    # is_out = create_is_out(qe, intervals)
+    # global p_0 = make_membershipcell_root(box, is_in, is_out)
+    p_0 = make_paving(intervals, qe)
+    global inn, out, delta = pave(p_0, qe, X_0, eps)
 end
+
+
+
+
+# cell = make_paving(intervals, qe)
+# println(is_in(cell, X_0, qe.quantifiers, 1))
+# println(is_out(cell, X_0, qe.quantifiers, 1))
+
+
+
+# is_in = create_is_in(qe, intervals)
+# is_out = create_is_out(qe, intervals)
+
+# pos = [i for (q, i) in qe.quantifiers]
+# real_pos = pos .- 1
+# invpermute!(intervals, real_pos)
+
+# cell = make_paving(intervals, is_in, is_out)
+
+
+# intervals = [interval(2, 8),interval(8,9),interval(0, 0)]
+# is_in = create_is_in(qe, intervals)
+# is_out = create_is_out(qe, intervals)
+
+# pos = [i for (q, i) in qe.quantifiers]
+# real_pos = pos .- 1
+# invpermute!(intervals, real_pos)
+# push!(cell, intervals, is_in, is_out)
+
+# intervals = [interval(2, 8),interval(6,8),interval(0, 0)]
+# is_in = create_is_in(qe, intervals)
+# is_out = create_is_out(qe, intervals)
+
+# pos = [i for (q, i) in qe.quantifiers]
+# real_pos = pos .- 1
+# invpermute!(intervals, real_pos)
+# push!(cell, intervals, is_in, is_out)
+# push!(cell, [interval(6, 8),interval(2, 8),interval(0, 0)])
+# push!(cell, [interval(6, 8),interval(2, 3),interval(0, 0)])
+# remove!(cell, [interval(6, 8),interval(2, 8),interval(0, 0)])                 # does something
+# remove!(cell, [interval(6, 8),interval(2, 8),interval(0, 0), interval(8,9)])  # does nothing as expected
+# remove!(cell, [interval(6, 8),interval(2, 8)])                                # does nothing as expected
+# print_tree(cell)
+
+
+
+
+
+# remove!(cell, [interval(8,9),interval(2,5),interval(0, 0)])
+# print_tree(cell)
+# bisect!(cell, qe)
+# bisect!(cell, qe)
+# remove!(cell, [interval(8,9),interval(2,5),interval(0, 0)])
+# print_tree(cell)
+
+
+
+# using Plots; pythonplot()
+# cell_0 = inn
+# xs = cell_0.box[1]
+# ys = cell_0.box[2]
+# xlims!((xs.lo, xs.hi))
+# ylims!((ys.lo, ys.hi))
+
+# rectangle(p, q) = Shape([p[1],q[1],q[1],p[1]], [p[2],p[2],q[2],q[2]])
+
+# current_plot = plot()
+
+# function draw_mcell(cell)
+#     if width(cell) < 4
+#         xs = cell.box[1]
+#         ys = cell.box[2]
+#         p = (xs.lo, ys.lo)
+#         q = (xs.hi, ys.hi)
+
+#         plot!(rectangle(p, q), color=cell.is_out(interval(3.75,3.875)) ? :cyan : :yellow)
+#     else
+#         for child in cell.children
+#             draw_mcell(child)
+#         end
+#     end
+# end
+
+# draw_mcell(cell_0)
+
+# plot(current_plot, aspect_ratio=1, legend=:false)
+# gui()
+
+
+# println(height(p_0))
+# println(p_0.is_in(X_0))
+# println(p_0.is_out(X_0))
+# # k = 0
+# for k = 1:17
+#     # global k += 1    
+#     bisect!(p_0, qe)
+# end
+# println(height(p_0))
+# println(width(p_0))
+# println(p_0.is_in(X_0))
+# println(p_0.is_out(X_0))
+
+# print_tree(p_0)
 
 print_inn_out_delta(inn, out, delta)
 

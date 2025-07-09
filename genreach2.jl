@@ -149,12 +149,12 @@ end
   # convenience function returning the inner-approximated interval for the contribution of xi, i between 1 and dim input, to function f for which we give the Jacobian Jf
   # try catch because the Jacobian of a linear function gives Float64 and not Interval
     try
-      Jl = range_Jf[i].lo
-      return abs(Jl)*interval(-1, 1)*radii[i]
+      Jl = abs(range_Jf[i]).lo
+      return Jl*interval(-1, 1)*radii[i]
       catch u
         # println(u)
-        Jl = range_Jf[i]
-        res = abs(Jl)*interval(-1, 1)
+        Jl = abs(range_Jf[i])
+        res = Jl*interval(-1, 1)
         return res*radii[i]
     end
   end
@@ -279,10 +279,13 @@ function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
 
   radii = [IntervalArithmetic.radius(input[i]) for i=1:p]
   input_center = [mid(input[i]) for i=1:p]
+  # println(radii)
    
   for j in 1:n
      c = Base.invokelatest(g_fun[j],input_center)
      range_Dg = Base.invokelatest(Dg_fun[j],input)
+
+    #  println(range_Dg)
    
      outer = interval(c,c)
 
@@ -306,6 +309,7 @@ function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
     inner = interval(c,c)
   
     for i = 2p-1:-2:1
+      # println(inner)
       if q[j][i] == "exists"
          inner = inner+I(range_Dg,radii,q[j][i+1])
       else
