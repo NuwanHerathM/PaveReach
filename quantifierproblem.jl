@@ -17,13 +17,17 @@ function index(qv::QuantifiedVariable)
     return qv[2]
 end
 
-function negation(qv::QuantifiedVariable)
-    quantifier, index = qv
+function negation(quantifier::Quantifier)
     @match quantifier begin
-        $Forall => return (Exists, index)
-        $Exists => return (Forall, index)
+        $Forall => return Exists
+        $Exists => return Forall
         _ => error("Unknown quantifier: $quantifier")
     end
+end
+
+function negation(qv::QuantifiedVariable)
+    quantifier, index = qv
+    return (negation(quantifier), index)
 end
 
 function quantifiedvariables2dirtyvariables(qvs::Vector{QuantifiedVariable})
@@ -44,22 +48,24 @@ end
 struct QuantifierProblem
     f::Vector{Function}
     Df::Vector{Function}
-    quantifiers::Vector{QuantifiedVariable}
+    qvs::Vector{QuantifiedVariable}
     p::Int
     n::Int
 end
 
-function QuantifierProblem(f, Df, quantifiers::Vector{Any}, p::Int, n::Int)
-    quantifier_variables = QuantifiedVariable[]
-    for i in 1:2:length(quantifiers)
-        if quantifiers[i] == "forall" && quantifiers[i+1] isa Int
-            push!(quantifier_variables, (Forall, quantifiers[i+1]))
-        elseif quantifiers[i] == "exists" && quantifiers[i+1] isa Int
-            push!(quantifier_variables, (Exists, quantifiers[i+1]))
-        elseif quantifiers[i] != "forall" && quantifiers[i] != "exists"
-            error("""Invalid quantifier: quantifiers[$i], "$(quantifiers[i])", should be "forall" or "exists".""")
+function QuantifierProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
+    @assert length(qvs) % 2 == 0 "Quantifier variables should be in pairs of (quantifier, index)."
+    for i in 1:2:length(qvs)
+        quantifier = qvs[i]
+        idx = qvs[i+1]
+        if quantifier == "forall" && idx isa Int
+            push!(quantifier_variables, (Forall, idx))
+        elseif quantifier == "exists" && idx isa Int
+            push!(quantifier_variables, (Exists, idx))
+        elseif quantifier != "forall" && quantifier != "exists"
+            error("""Invalid quantifier: qvs[$i], "$(quantifier)", should be "forall" or "exists".""")
         else
-            error("""Invalid quantifier: quantifier[$(i+1)], "$(quantifiers[i+1])", should be an integer.""")
+            error("""Invalid quantifier: qvs[$(i+1)], "$(idx)", should be an integer.""")
         end
     end
     return QuantifierProblem(f, Df, quantifier_variables, p, n)
@@ -67,8 +73,8 @@ end
 
 function quantifier(qe::QuantifierProblem, dim::Int)
     i = 1
-    while index(qe.quantifiers[i]) != dim
+    while index(qe.qvs[i]) != dim
         i += 1
     end
-    return quantifier(qe.quantifiers[i])
+    return quantifier(qe.qvs[i])
 end

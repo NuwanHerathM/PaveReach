@@ -92,16 +92,20 @@ eps = 0.1
     # is_in = create_is_in(qe, intervals)
     # is_out = create_is_out(qe, intervals)
     # global p_0 = make_membershipcell_root(box, is_in, is_out)
-    p_0 = make_paving(intervals, qe)
-    global inn, out, delta = pave(p_0, qe, X_0, eps)
+    p_in_0 = make_in_paving(intervals, qe)
+    p_out_0 = make_out_paving(intervals, qe)
+    global inn, out, delta = pave(p_in_0, p_out_0, qe, X_0, eps)
 end
 
+# println(local_cell(p_0.children[1]))
 
 
-
-# cell = make_paving(intervals, qe)
-# println(is_in(cell, X_0, qe.quantifiers, 1))
-# println(is_out(cell, X_0, qe.quantifiers, 1))
+# cell_in = make_in_paving(intervals, qe)
+# cell_out = make_out_paving(intervals, qe)
+# print_tree(cell_in)
+# print_tree(cell_out)
+# println(is_member(cell_in, X_0))
+# println(is_member(cell_out, X_0))
 
 
 
@@ -125,31 +129,35 @@ end
 # push!(cell, intervals, is_in, is_out)
 
 # intervals = [interval(2, 8),interval(6,8),interval(0, 0)]
-# is_in = create_is_in(qe, intervals)
-# is_out = create_is_out(qe, intervals)
+# is_in_0 = create_is_in(qe, intervals)
+# is_out_0 = create_is_out(qe, intervals)
+# intervals = [interval(2, 3),interval(6,8),interval(0, 0)]
+# is_in_1 = create_is_in(qe, intervals)
+# is_out_1 = create_is_out(qe, intervals)
+
+# quantifiers = quantifier.(qe.qvs)
 
 # pos = [i for (q, i) in qe.quantifiers]
 # real_pos = pos .- 1
 # invpermute!(intervals, real_pos)
 # push!(cell, intervals, is_in, is_out)
-# push!(cell, [interval(6, 8),interval(2, 8),interval(0, 0)])
-# push!(cell, [interval(6, 8),interval(2, 3),interval(0, 0)])
+# print_tree(cell)
+# push!(cell, [interval(6, 8),interval(2, 8),interval(0, 0)], quantifiers, is_in_0, is_out_0)
+# push!(cell, [interval(6, 8),interval(2, 3),interval(0, 0)], quantifiers, is_in_1, is_out_1)
 # remove!(cell, [interval(6, 8),interval(2, 8),interval(0, 0)])                 # does something
 # remove!(cell, [interval(6, 8),interval(2, 8),interval(0, 0), interval(8,9)])  # does nothing as expected
 # remove!(cell, [interval(6, 8),interval(2, 8)])                                # does nothing as expected
 # print_tree(cell)
 
-
-
-
-
 # remove!(cell, [interval(8,9),interval(2,5),interval(0, 0)])
 # print_tree(cell)
-# bisect!(cell, qe)
-# bisect!(cell, qe)
+# bisect_in!(cell_in, qe)
+# bisect_in!(cell_in, qe)
+# bisect_out!(cell_out, qe)
+# bisect_out!(cell_out, qe)
 # remove!(cell, [interval(8,9),interval(2,5),interval(0, 0)])
-# print_tree(cell)
-
+# print_tree(cell_in)
+# print_tree(cell_out)
 
 
 # using Plots; pythonplot()

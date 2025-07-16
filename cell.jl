@@ -2,7 +2,15 @@ using AbstractTrees
 
 abstract type AbstractCell end
 
-struct Cell <: AbstractCell
+abstract type Cell <: AbstractCell end
+
+struct BisectableCell <: Cell
+    interval::IntervalArithmetic.Interval{T} where T<:Number
+    children::Vector{AbstractCell}
+    parent::AbstractCell
+end
+
+struct AtomicCell <: Cell
     interval::IntervalArithmetic.Interval{T} where T<:Number
     children::Vector{AbstractCell}
     parent::AbstractCell
@@ -12,43 +20,86 @@ struct CellStart <: AbstractCell
     children::Vector{AbstractCell}
 end
 
-struct CellEnd <: AbstractCell
+abstract type CellEnd <: AbstractCell end
+
+struct BisectableCellEnd <: CellEnd
     interval::IntervalArithmetic.Interval{T} where T<:Number
     parent::AbstractCell
-    is_in::Function
-    is_out::Function
+    is_member::Function
 end
+
+struct AtomicCellEnd <: CellEnd
+    interval::IntervalArithmetic.Interval{T} where T<:Number
+    parent::AbstractCell
+    is_member::Function
+end
+
+Bisectable = Union{BisectableCell, BisectableCellEnd}
+Atomic = Union{AtomicCell, AtomicCellEnd}
 
 AbstractTrees.children(cell::AbstractCell) = isa(cell, CellEnd) ? [] : cell.children
 AbstractTrees.parent(cell::AbstractCell) = isa(cell, CellStart) ? nothing : cell.parent
-AbstractTrees.nodevalue(cell::AbstractCell) = isa(cell, CellStart) ? emptyinterval() : cell.interval
+AbstractTrees.nodevalue(cell::AbstractCell) = isa(cell, CellStart) ? emptyinterval() : (cell.interval, typeof(cell))
 isleaf(cell::AbstractCell) = isa(cell, CellEnd) || (isroot(cell) && isempty(cell.children))
 AbstractTrees.isroot(cell::AbstractCell) = isa(cell, CellStart)
 
-function Cell(interval::IntervalArithmetic.Interval{T}, parent::Union{CellStart, Cell}) where T<:Number
-    return Cell(interval, [], parent)
+function BisectableCell(interval::IntervalArithmetic.Interval{T}, parent::Union{CellStart, Cell}) where T<:Number
+    return BisectableCell(interval, [], parent)
+end
+
+function AtomicCell(interval::IntervalArithmetic.Interval{T}, parent::Union{CellStart, Cell}) where T<:Number
+    return AtomicCell(interval, [], parent)
 end
 
 function CellStart()
     return CellStart([])
 end
 
-import Base: push!
-
-function push!(cell::CellStart, intervals, is_in, is_out)
-    return push!(cell, intervals, 1, is_in, is_out)
+function height(cell::AbstractCell)
+    if isleaf(cell)
+        return 0
+    else
+        return 1 + height(first(cell.children))
+    end
 end
 
-function push!(cell::AbstractCell, intervals, i, is_in, is_out)
-    if i > length(intervals)
+function get_constructors(cell::CellStart)
+    constructors = []
+    current = first(cell.children)
+    push!(constructors, constructorof(typeof(current)))
+    while !isleaf(current)
+        current = first(current.children)
+        push!(constructors, constructorof(typeof(current)))
+    end
+    return constructors
+end
+
+import Base: push!
+
+using ConstructionBase
+
+function push!(cell::CellStart, intervals, is_member)
+    @assert height(cell) == length(intervals) "Height of the cell must match the number of intervals."
+    constructors = get_constructors(cell)
+    return push!(cell, intervals, 1, constructors, is_member)
+end
+
+function push!(cell::AbstractCell, intervals, i, constructors, is_member)
+    l = length(intervals)
+    if i > l
         return
     end
 
     pos = findfirst(isequal(intervals[i]), [child.interval for child in cell.children])
     if !isnothing(pos)
-        push!(cell.children[pos], intervals, i+1, is_in, is_out)
+        push!(cell.children[pos], intervals, i+1, constructors, is_member)
     else
-        child = make_paving(intervals, i, cell, is_in, is_out)
+        if i == l
+            child = constructors[i](intervals[i], cell, is_member)
+        else
+            child = constructors[i](intervals[i], cell)
+            push!(child, intervals, i+1, constructors, is_member)
+        end
         push!(cell.children, child)
     end
 end
@@ -85,11 +136,19 @@ end
 
 function diam(cell::AbstractCell)
     if isleaf(cell)
-        return IntervalArithmetic.diam(cell.interval)
+        if isa(cell, BisectableCellEnd)
+            return IntervalArithmetic.diam(cell.interval)
+        else
+            return 0
+        end
     elseif isroot(cell)
         return maximum(diam.(cell.children))
     else
-        return maximum([IntervalArithmetic.diam(cell.interval), diam.(cell.children)...])
+        if isa(cell, BisectableCell)
+            return maximum([IntervalArithmetic.diam(cell.interval), diam.(cell.children)...])
+        else
+            return maximum(diam.(cell.children))
+        end
     end
 end
 
