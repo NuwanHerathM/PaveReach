@@ -18,7 +18,6 @@ function create_is_in(qe::QuantifierProblem, intervals::AbstractVector{IntervalA
         quantifiers = [(Forall, 1), qe.qvs[1:end-1]..., (Exists, qe.p)]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         R_inner, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X, intervals...])
-        # println("R_inner: ", R_inner)
         return R_inner[1] ⊇ interval(0, 0)
     end
 end
@@ -50,41 +49,6 @@ end
 function create_is_out(qe::QuantifierProblem, box::IntervalBox)::Function
     return create_is_out(qe, box.v)
 end
-
-# function is_in(cell::AbstractCell, X::IntervalArithmetic.Interval{T}, quantifiers::Vector{Quantifier}, i::Int) where T<:Number
-#     if !isleaf(cell)
-#         q = quantifiers[i]
-#         if q == Exists
-#             return any(child -> is_in(child, X, quantifiers, i+1), cell.children)
-#         else
-#             return all(child -> is_in(child, X, quantifiers, i+1), cell.children)
-#         end
-#     else
-#         return cell.is_in(X)
-#     end
-# end
-
-# function is_in(cell::CellStart, X::IntervalArithmetic.Interval{T}, quantifiers::Vector{Quantifier}) where T<:Number
-#     return is_in(cell, X, quantifiers, 1)
-# end
-
-# function is_out(cell::AbstractCell, X::IntervalArithmetic.Interval{T}, quantifiers::Vector{Quantifier}, i::Int) where T<:Number
-#     if !isleaf(cell)
-#         q = quantifiers[i]
-#         if q == Exists
-#             return all(child -> is_out(child, X, quantifiers, i+1), cell.children)
-#         else
-#             return any(child -> is_out(child, X, quantifiers, i+1), cell.children)
-#         end
-#     else
-#         return cell.is_out(X)
-#     end
-    
-# end
-
-# function is_out(cell::CellStart, X::IntervalArithmetic.Interval{T}, quantifiers::Vector{Quantifier}) where T<:Number
-#     return is_out(cell, X, quantifiers, 1)
-# end
 
 function is_member(cell::AbstractCell, X::IntervalArithmetic.Interval{T}) where T<:Number
     if isleaf(cell)
@@ -129,21 +93,21 @@ end
 
 function make_paving(intervals, i, parent::Union{CellStart, Cell}, quantifiers, is_member)
     interval = intervals[i]
-    q = quantifiers[i]
+    quantifier = quantifiers[i]
     if interval != intervals[end]
-        if q == Exists
-            current = BisectableCell(interval, parent)
-        else
-            current = AtomicCell(interval, parent)
+        current = @match quantifier begin
+            $Forall => AtomicCell(interval, parent)
+            $Exists => BisectableCell(interval, parent)
+            _ => error("Unknown quantifier: $quantifier")
         end
         child = make_paving(intervals, i+1, current, quantifiers, is_member)
         push!(current.children, child)
         return current
     else
-        if q == Exists
-            return BisectableCellEnd(interval, parent, is_member)
-        else
-            return AtomicCellEnd(interval, parent, is_member)
+        @match quantifier begin
+            $Forall => return AtomicCellEnd(interval, parent, is_member)
+            $Exists => return BisectableCellEnd(interval, parent, is_member)
+            _ => error("Unknown quantifier: $quantifier")
         end
     end
 end
@@ -190,23 +154,17 @@ function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0:
         if is_member(p_in, X)
             push!(inn, X)
         elseif is_member(p_out, X)
-            # println(X)
-            # println(width(p))
-            # print_tree(p)
             push!(out, X)
-            if X.lo == 3.75 && X.hi == 3.875
-                return p
-            end
         elseif IntervalArithmetic.diam(X) < ϵ
             push!(delta, X)
         else
-            # diam = maximum(diam(p_in), diam(p_out))
-            if IntervalArithmetic.diam(X) > ratio * diam(p_in) || diam(p_in) < precision_factor * ϵ
+            max_diam = maximum(diam, [p_in, p_out])
+            if IntervalArithmetic.diam(X) > ratio * max_diam || max_diam < precision_factor * ϵ
                 X_1, X_2 = bisect(X, 0.5)
-                p_in_1 = deepcopy(p_in) # ?
-                p_out_1 = deepcopy(p_out) # ?
-                p_in_2 = deepcopy(p_in)
-                p_out_2 = deepcopy(p_out)
+                p_in_1 = deepcopy(p_in_0)
+                p_out_1 = deepcopy(p_out_0)
+                p_in_2 = deepcopy(p_in_0)
+                p_out_2 = deepcopy(p_out_0)
                 push!(list, (p_in_1, p_out_1, X_1))
                 push!(list, (p_in_2, p_out_2, X_2))
             else
@@ -218,8 +176,6 @@ function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0:
     end
     return (inn, out, delta)
 end
-
-# import Base: push!
 
 function _bisect(cell::CellStart)
     n = height(cell)
@@ -283,8 +239,6 @@ function bisect!(cell::CellStart, qe::QuantifierProblem, create_is_member::Funct
     is_member_1 = create_is_member(qe, IntervalBox(reordered_intervals_1))
     is_member_2 = create_is_member(qe, IntervalBox(reordered_intervals_2))
 
-    # print_tree(cell)
-    # println(intervals_1)
     push!(cell, intervals_1, is_member_1)
     push!(cell, intervals_2, is_member_2)
     remove!(cell_end)
