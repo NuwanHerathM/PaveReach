@@ -76,9 +76,6 @@ end
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
         global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 2), (Exists, 4)], p, n)
         global X_0 = interval(0, 6)
-        # global X_0 = interval(3.75, 3.9375)
-        # global X_0 = interval(3.75, 4) # is inside
-        # global X_0 = interval(3.5, 4) # is not inside but should :(
         Z = interval(0, 0)
         global intervals = [interval(2, 8), interval(6, 8), Z]
     end
@@ -86,19 +83,19 @@ end
 end
 
 eps = 0.1
-@btime begin
+# @btime begin
     # global inn, out, delta = pave(qe, intervals, X_0, eps)
     # box = IntervalBox(intervals)
     # is_in = create_is_in(qe, intervals)
     # is_out = create_is_out(qe, intervals)
     # global p_0 = make_membershipcell_root(box, is_in, is_out)
-    p_in_0 = make_in_paving(intervals, qe)
-    p_out_0 = make_out_paving(intervals, qe)
-    global inn, out, delta = pave(p_in_0, p_out_0, qe, X_0, eps)
-end
+# p_in_0 = make_in_paving(intervals, qe)
+# p_out_0 = make_out_paving(intervals, qe)
+p_in_0, p_out_0 = make_paving(intervals, qe)
+inn, out, delta = pave(p_in_0, p_out_0, qe, X_0, eps)
+# end
 
 # println(local_cell(p_0.children[1]))
-
 
 # cell_in = make_in_paving(intervals, qe)
 # cell_out = make_out_paving(intervals, qe)
