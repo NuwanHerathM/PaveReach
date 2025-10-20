@@ -91,8 +91,8 @@ eps = 0.1
     # global p_0 = make_membershipcell_root(box, is_in, is_out)
 # p_in_0 = make_in_paving(intervals, qe)
 # p_out_0 = make_out_paving(intervals, qe)
-p_in_0, p_out_0 = make_paving(intervals, qe)
-inn, out, delta = pave(p_in_0, p_out_0, qe, X_0, eps)
+p_in_0, p_out_0 = make_paving_11(intervals, qe)
+inn, out, delta = pave_11(p_in_0, p_out_0, qe, X_0, eps)
 # end
 
 # println(local_cell(p_0.children[1]))
