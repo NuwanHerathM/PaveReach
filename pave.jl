@@ -30,9 +30,9 @@ function create_is_in_2(qe::QuantifierProblem, intervals::AbstractVector{Interva
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         Z_minus = interval(-pseudo_infinity, intervals[end].lo - ϵ)
         Z_plus = interval(intervals[end].hi + ϵ, pseudo_infinity)
-        R_inner_minus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
-        R_inner_plus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
-        return interval(0, 0) ⊈ R_inner_minus[1] && interval(0, 0) ⊈ R_inner_plus[1]
+        _, R_outer_minus = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
+        _, R_outer_plus = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
+        return interval(0, 0) ⊈ R_outer_minus[1] && interval(0, 0) ⊈ R_outer_plus[1]
     end
 end
 
@@ -52,6 +52,15 @@ end
 - `pseudo_infinity` a large number to represent infinity in the intervals
 - `ϵ` a small number to create a margin around the interval Z for its complement
 """
+function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+    return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
+        quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs...]
+        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
+        _, R_outer = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
+        return  interval(0,0) ⊈ R_outer[1]
+    end
+end
+
 function create_is_out_2(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, pseudo_infinity::Int=1000, ϵ::Float64=0.1)::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-1])..., (Exists, qe.p)]
@@ -61,15 +70,6 @@ function create_is_out_2(qe::QuantifierProblem, intervals::AbstractVector{Interv
         R_inner_minus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
         R_inner_plus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
         return interval(0, 0) ⊆ R_inner_minus[1] || interval(0, 0) ⊆ R_inner_plus[1]
-    end
-end
-
-function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, pseudo_infinity::Int=1000, ϵ::Float64=0.1)::Function where {T<:Number}
-    return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs...]
-        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        _, R_outer = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
-        return  interval(0,0) ⊈ R_outer[1]
     end
 end
 
@@ -187,7 +187,7 @@ function make_in_pz_2(intervals, qe)
 
     constructors_in = get_in_constructors_2(quantifiers)
 
-    root_in = make_paving_tree_from_constructors(constructors_in, permuted_intervals, is_in)
+    root_in = make_pz_tree_from_constructors(constructors_in, permuted_intervals, is_in)
     return root_in
 end
 

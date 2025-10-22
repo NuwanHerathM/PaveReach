@@ -17,7 +17,7 @@ The example in `ex_runningexample.jl` sets up the scalar problem:
 $$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], \exists z \in [-1/4, 1/4], f(x, p_1, z) = p_1^2 - (x - 1)(x - 2)(x - 3) - z\}$$
 
 - Quantifiers: ∀ p1 ∈ [0, 1/4], ∃ z ∈ [-1/4, 1/4]
-- Domain for x: X0 = [-5, 5]
+- Domain for x: X_0 = [-5, 5]
 - Paving precision: `eps = 0.1`
 
 The script:

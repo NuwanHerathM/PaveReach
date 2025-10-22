@@ -84,24 +84,36 @@ end
         n = 1
         p = 3
         @variables x[1:p]
-        f_num = [x[1]^2 + x[2]^2 - x[3]^2]
+        f_num = [x[1]^2 + x[2]^2 - x[3]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
         global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 3)], p, n)
         global X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
-        Z = interval(0, 4)
+        Z = interval(0, 16)
         global intervals = [Z]
     end
     5 => begin
-        # partial example Jirstrand, 1997 -> not working yet
+        # partial example Jirstrand, 1997 (1/2) -> not working yet
         n = 1
         p = 6
         @variables x[1:p]
-        f_num = [x[3]*x[1] + x[4] - x[5]*x[6]]
+        f_num = [x[3]*x[1] + x[4] - x[5]*x[1] - x[6]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 4), (Forall, 5), (Exists, 6)], p, n)
+        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 4), (Exists, 5), (Exists, 6)], p, n)
         global X_0 = IntervalBox([interval(-1, 1), interval(0, 5)])
         Z = interval(0, 0)
-        global intervals = [interval(0, 1), interval(-1, 1), interval(0, ∞), Z]
+        global intervals = [interval(0, 1), interval(-1, 1), interval(0, 1000), Z]
+    end
+    6 => begin
+        # partial example Jirstrand, 1997 (2/2) -> not working yet
+        n = 1
+        p = 6
+        @variables x[1:p]
+        f_num = [(x[3]*(x[2] - 1) + 1)^2 - x[5]*(x[2] - 1) - x[6]]
+        f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 4), (Exists, 5), (Exists, 6)], p, n)
+        global X_0 = IntervalBox([interval(-1, 1), interval(0, 5)])
+        Z = interval(0, 0)
+        global intervals = [interval(0, 1), interval(-1, 1), interval(0, 1000), Z]
     end
     _ => error("Invalid choice")
 end
@@ -119,114 +131,6 @@ p_in_0, p_out_0 = make_pz_11(intervals, qe)
 inn, out, delta = pave_11(p_in_0, p_out_0, qe, X_0, eps)
 # end
 
-# println(local_cell(p_0.children[1]))
-
-# cell_in = make_in_paving(intervals, qe)
-# cell_out = make_out_paving(intervals, qe)
-# print_tree(cell_in)
-# print_tree(cell_out)
-# println(is_member(cell_in, X_0))
-# println(is_member(cell_out, X_0))
-
-
-
-# is_in = create_is_in(qe, intervals)
-# is_out = create_is_out(qe, intervals)
-
-# pos = [i for (q, i) in qe.quantifiers]
-# real_pos = pos .- 1
-# invpermute!(intervals, real_pos)
-
-# cell = make_paving(intervals, is_in, is_out)
-
-
-# intervals = [interval(2, 8),interval(8,9),interval(0, 0)]
-# is_in = create_is_in(qe, intervals)
-# is_out = create_is_out(qe, intervals)
-
-# pos = [i for (q, i) in qe.quantifiers]
-# real_pos = pos .- 1
-# invpermute!(intervals, real_pos)
-# push!(cell, intervals, is_in, is_out)
-
-# intervals = [interval(2, 8),interval(6,8),interval(0, 0)]
-# is_in_0 = create_is_in(qe, intervals)
-# is_out_0 = create_is_out(qe, intervals)
-# intervals = [interval(2, 3),interval(6,8),interval(0, 0)]
-# is_in_1 = create_is_in(qe, intervals)
-# is_out_1 = create_is_out(qe, intervals)
-
-# quantifiers = quantifier.(qe.qvs)
-
-# pos = [i for (q, i) in qe.quantifiers]
-# real_pos = pos .- 1
-# invpermute!(intervals, real_pos)
-# push!(cell, intervals, is_in, is_out)
-# print_tree(cell)
-# push!(cell, [interval(6, 8),interval(2, 8),interval(0, 0)], quantifiers, is_in_0, is_out_0)
-# push!(cell, [interval(6, 8),interval(2, 3),interval(0, 0)], quantifiers, is_in_1, is_out_1)
-# remove!(cell, [interval(6, 8),interval(2, 8),interval(0, 0)])                 # does something
-# remove!(cell, [interval(6, 8),interval(2, 8),interval(0, 0), interval(8,9)])  # does nothing as expected
-# remove!(cell, [interval(6, 8),interval(2, 8)])                                # does nothing as expected
-# print_tree(cell)
-
-# remove!(cell, [interval(8,9),interval(2,5),interval(0, 0)])
-# print_tree(cell)
-# bisect_in!(cell_in, qe)
-# bisect_in!(cell_in, qe)
-# bisect_out!(cell_out, qe)
-# bisect_out!(cell_out, qe)
-# remove!(cell, [interval(8,9),interval(2,5),interval(0, 0)])
-# print_tree(cell_in)
-# print_tree(cell_out)
-
-
-# using Plots; pythonplot()
-# cell_0 = inn
-# xs = cell_0.box[1]
-# ys = cell_0.box[2]
-# xlims!((xs.lo, xs.hi))
-# ylims!((ys.lo, ys.hi))
-
-# rectangle(p, q) = Shape([p[1],q[1],q[1],p[1]], [p[2],p[2],q[2],q[2]])
-
-# current_plot = plot()
-
-# function draw_mcell(cell)
-#     if width(cell) < 4
-#         xs = cell.box[1]
-#         ys = cell.box[2]
-#         p = (xs.lo, ys.lo)
-#         q = (xs.hi, ys.hi)
-
-#         plot!(rectangle(p, q), color=cell.is_out(interval(3.75,3.875)) ? :cyan : :yellow)
-#     else
-#         for child in cell.children
-#             draw_mcell(child)
-#         end
-#     end
-# end
-
-# draw_mcell(cell_0)
-
-# plot(current_plot, aspect_ratio=1, legend=:false)
-# gui()
-
-
-# println(height(p_0))
-# println(p_0.is_in(X_0))
-# println(p_0.is_out(X_0))
-# # k = 0
-# for k = 1:17
-#     # global k += 1    
-#     bisect!(p_0, qe)
-# end
-# println(height(p_0))
-# println(width(p_0))
-# println(p_0.is_in(X_0))
-# println(p_0.is_out(X_0))
-
-# print_tree(p_0)
 
 print_inn_out_delta(inn, out, delta)
 
