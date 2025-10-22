@@ -310,7 +310,7 @@ end
 - `ratio` ratio to determine when to split the cell: if diam(X) / diam(p) <= ratio then split p
 - `precision_factor` factor to get the precision threshold for p: if diam(p) < precision_factor * ϵ then p is not split
 """
-function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, bisect_in!, bisect_out!, ratio::Float64=0.2, precision_factor::Int=10)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, bisect_in!, bisect_out!, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     inn = []
     out = []
     delta = []
@@ -325,7 +325,7 @@ function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0:
             push!(delta, X)
         else
             max_diam = maximum(diam, [p_in, p_out])
-            if IntervalArithmetic.diam(X) > ratio * max_diam || max_diam < precision_factor * ϵ
+            if (!is_refined) || IntervalArithmetic.diam(X) > ratio * max_diam || max_diam < precision_factor * ϵ
                 X_1, X_2 = bisect(X, 0.5)
                 p_in_1 = deepcopy(p_in_0)
                 p_out_1 = deepcopy(p_out_0)
@@ -343,19 +343,19 @@ function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0:
     return (inn, out, delta)
 end
 
-function pave_11(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_11(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_1!, ratio, precision_factor)
 end
 
-function pave_12(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_12(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_2!, ratio, precision_factor)
 end
 
-function pave_21(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_21(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_1!, ratio, precision_factor)
 end
 
-function pave_22(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_22(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_2!, ratio, precision_factor)
 end
 

@@ -27,12 +27,12 @@ parsed_args = parse_commandline()
 
 n = 1                                                                    # 1
 p = 3                                                                    # Dimension of the domain of f
-@variables x[1:p]                                                        # x[1] := x, x[2] := p_1, x[3] := z
-f_num = [x[2]^2-(x[1]-1)*(x[1]-2)*(x[1]-3)-x[3]]                         # f(x, p_1, z) = p_1^2 - (x - 1)(x - 2)(x - 3) - z
+@variables x[1:p]                                                        # x[1] := x_1, x[2] := x_2, x[3] := z
+f_num = [x[1]^2 + x[2]^2 - x[3]]                                         # f(x, p_1, z) = x_1^2 + x_2^2 - z
 f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 2), (Exists, 3)], p, n)  # f, Df, [∀ p1, ∃ z], p, n
-X_0 = IntervalBox(interval(-5, 5))                                       # Domain to be paved X_0
-intervals = [interval(0, 1/4), interval(-1/4, 1/4)]                      # p_1 ∈ [0, 1/4], z ∈ [-1/4, 1/4]
+qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 3)], p, n)               # f, Df, [∃ z], p, n
+X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))                      # Domain to be paved X_0
+intervals = [interval(0, 16)]                                            # z ∈ Z = [0, 16]
 
 
 eps = 0.1                                                                # Precision

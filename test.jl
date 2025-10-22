@@ -128,7 +128,7 @@ eps = 0.5
 # p_in_0 = make_in_paving(intervals, qe)
 # p_out_0 = make_out_paving(intervals, qe)
 p_in_0, p_out_0 = make_pz_11(intervals, qe)
-inn, out, delta = pave_11(p_in_0, p_out_0, qe, X_0, eps)
+inn, out, delta = pave_11(p_in_0, p_out_0, qe, X_0, eps, is_refined=false)
 # end
 
 
