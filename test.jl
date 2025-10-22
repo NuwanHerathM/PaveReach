@@ -51,7 +51,7 @@ end
         f_num = [x[1]+x[2]-x[3]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
         global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 2), (Exists, 3)], p, n)
-        global X_0 = interval(-10, 10)
+        global X_0 = IntervalBox(interval(-10, 10))
         Z = interval(3, 4)
         global intervals = [interval(2, 8), Z]
     end
@@ -63,7 +63,7 @@ end
         f_num = [x[1]^2+x[2]^2-x[3]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
         global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 2), (Exists, 3)], p, n)
-        global X_0 = interval(-10, 10)
+        global X_0 = IntervalBox(interval(-10, 10))
         Z = interval(3, 5)
         global intervals = [interval(-3, 3), Z]
     end
@@ -75,14 +75,38 @@ end
         f_num = [x[1]^2+x[2]^2+2*x[1]*x[2]-20*x[1]-20x[2]+100-x[3]-x[4]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
         global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 2), (Exists, 4)], p, n)
-        global X_0 = interval(0, 6)
+        global X_0 = IntervalBox(interval(0, 6))
         Z = interval(0, 0)
         global intervals = [interval(2, 8), interval(6, 8), Z]
+    end
+    4 => begin
+        # disk example
+        n = 1
+        p = 3
+        @variables x[1:p]
+        f_num = [x[1]^2 + x[2]^2 - x[3]^2]
+        f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+        global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 3)], p, n)
+        global X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
+        Z = interval(0, 4)
+        global intervals = [Z]
+    end
+    5 => begin
+        # partial example Jirstrand, 1997 -> not working yet
+        n = 1
+        p = 6
+        @variables x[1:p]
+        f_num = [x[3]*x[1] + x[4] - x[5]*x[6]]
+        f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 4), (Forall, 5), (Exists, 6)], p, n)
+        global X_0 = IntervalBox([interval(-1, 1), interval(0, 5)])
+        Z = interval(0, 0)
+        global intervals = [interval(0, 1), interval(-1, 1), interval(0, ∞), Z]
     end
     _ => error("Invalid choice")
 end
 
-eps = 0.1
+eps = 0.5
 # @btime begin
     # global inn, out, delta = pave(qe, intervals, X_0, eps)
     # box = IntervalBox(intervals)
@@ -91,7 +115,7 @@ eps = 0.1
     # global p_0 = make_membershipcell_root(box, is_in, is_out)
 # p_in_0 = make_in_paving(intervals, qe)
 # p_out_0 = make_out_paving(intervals, qe)
-p_in_0, p_out_0 = make_paving_11(intervals, qe)
+p_in_0, p_out_0 = make_pz_11(intervals, qe)
 inn, out, delta = pave_11(p_in_0, p_out_0, qe, X_0, eps)
 # end
 
@@ -208,26 +232,5 @@ print_inn_out_delta(inn, out, delta)
 
 # Display the results on a plot if requested
 if parsed_args["display"]
-
-    using Plots; pythonplot()
-    ylims!((-0.1,0.1))
-    xticks!((X_0.lo:1:X_0.hi))
-
-    function draw_lines(intervals, color)
-        ys = [0, 0]
-        for interval in intervals
-            xs = [interval.lo, interval.hi]
-            plot!(xs, ys, linewidth=2, color=color, legend=:false)
-        end
-    end
-
-    draw_delta_lines(delta) = draw_lines(merge_intervals(delta), :yellow)
-    draw_inn_lines(inn) = draw_lines(merge_intervals(inn), :green)
-    draw_out_lines(out) = draw_lines(merge_intervals(out), :cyan)
-
-    draw_delta_lines(delta)
-    draw_inn_lines(inn)
-    draw_out_lines(out)
-    gui()
-
+    display(X_0, inn, out, delta)
 end
