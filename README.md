@@ -5,25 +5,25 @@
 Try the running example from the article (Example 3.1):
 ```julia
 # Non-interactive run (prints inn/out/delta)
-julia ex_runningexample.jl
+julia 3-2_runningexample.jl
 
 # Run and keep REPL open for interactive plotting / display
-julia -i ex_runningexample.jl -d
+julia -i 3-2_runningexample.jl -d
 ```
 Try a 2D toy example:
 ```julia
 # Non-interactive run (prints size of inn/out/delta)
-julia ex_disk.jl
+julia 0-1_disk.jl
 
 # Run and keep REPL open for interactive plotting / display
-julia -i ex_disk.jl -d
+julia -i 0-1_disk.jl -d
 ```
 
 ## What the examples do
 
-### Detailed explanation for a 1D example (`ex_runningexample.jl`)
+### Detailed explanation for a 1D example (`3-2_runningexample.jl`)
 
-The example in `ex_runningexample.jl` sets up the scalar problem:
+The example in `3-2_runningexample.jl` sets up the scalar problem:
 $$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], \exists z \in [-1/4, 1/4], f(x, p_1, z) = p_1^2 - (x - 1)(x - 2)(x - 3) - z = 0 \}$$
 
 - Quantifiers: $∀ p1 ∈ [0, 1/4], ∃ z ∈ [-1/4, 1/4]$
@@ -42,7 +42,9 @@ p = 3
 # f(x, p_1, z) = p_1^2 - (x - 1)(x - 2)(x - 3) - z
 f_num = [x[2]^2-(x[1]-1)*(x[1]-2)*(x[1]-3)-x[3]]
 f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-# f, Df, [∀ p1, ∃ z], p, n
+# problem := f, Df
+problem = Problem(f_fun, Df_fun)
+# problem, [∀ p1, ∃ z], p, n
 qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 2), (Exists, 3)], p, n)
 ```
 2. Builds initial inner/outer refinement trees and runs `pave_11`.
@@ -67,9 +69,9 @@ After running, the script prints three objects:
 - `out` — blue
 - `delta` — yellow
 
-### Brief explanation for a 2D example (`ex_disk.jl`)
+### Brief explanation for a 2D example (`0-1_disk.jl`)
 
-The example in `ex_disk.jl` sets up the scalar problem:
+The example in `0-1_disk.jl` sets up the scalar problem:
 $$\{ x \in [-5, 5] \times [-5, 5] \, | \, \exists z \in [0, 16], f(x, z) = x_1^2 + x_2^2 - z = 0 \}$$
 
 - Quantifier: $∃ z ∈ [0, 16]$
@@ -88,8 +90,10 @@ p = 3
 # f(x, p_1, z) = x_1^2 + x_2^2 - z
 f_num = [x[1]^2 + x[2]^2 - x[3]]
 f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+# problem := f, Df
+problem = Problem(f_fun, Df_fun)
 # f, Df, [∃ z], p, n
-qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 3)], p, n)
+qe = QuantifierProblem(problem, [(Exists, 3)], p, n)
 ```
 2. Builds initial inner/outer refinement trees and runs `pave_11`.
 ```julia
@@ -134,3 +138,35 @@ or
 ```julia
 inn, out, delta = pave_11(pz_in_0, pz_out_0, qe, X_0, eps, is_refined=true)
 ```
+
+## Conjunction and disjunction
+
+For a conjunction
+$$\{ \dots \, | \, \dots, f_1(x, p, z) = 0  \, \wedge \, f_2(x, p, z) = 0 \, \wedge \, f_3(x, p, z) = 0 \}$$
+```julia
+f_fun_1, Df_fun_1 = ...
+problem_1 = Problem(f_fun_1, Df_fun_1)
+f_fun_2, Df_fun_2 = ...
+problem_2 = Problem(f_fun_2, Df_fun_2)
+f_fun_3, Df_fun_3 = ...
+problem_3 = Problem(f_fun_3, Df_fun_3)
+# Conjunction
+problem = AndProblem([problem_1, problem_2, problem_3])
+```
+
+For a combination of disjunction and conjunction
+$$\{ \dots \, | \, \dots, (f_1(x, p, z) = 0  \, \vee \, f_2(x, p, z) = 0) \, \wedge \, f_3(x, p, z) = 0 \}$$
+```julia
+f_fun_1, Df_fun_1 = ...
+problem_1 = Problem(f_fun_1, Df_fun_1)
+f_fun_2, Df_fun_2 = ...
+problem_2 = Problem(f_fun_2, Df_fun_2)
+f_fun_3, Df_fun_3 = ...
+problem_3 = Problem(f_fun_3, Df_fun_3)
+# Disjunction -- subproblem
+sub_problem = OrProblem([problem_1, problem_2])
+# Conjunction -- problem
+problem = AndProblem([sub_problem, problem_3])
+```
+
+See `0-3_disk_intersection.jl` for an example of a conjuction.

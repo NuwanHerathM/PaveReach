@@ -45,9 +45,26 @@ end
 
 #----------------------------------------------------------------------------------------
 
-struct QuantifierProblem
+struct Problem
     f::Vector{Function}
     Df::Vector{Function}
+end
+
+abstract type ConnectedProblem end
+
+struct AndProblem <: ConnectedProblem
+    problems::Vector{Union{Problem, ConnectedProblem}}
+end
+
+struct OrProblem <: ConnectedProblem
+    problems::Vector{Union{Problem, ConnectedProblem}}
+end
+
+problems(problem::ConnectedProblem) = problem.problems
+problems(problem::Problem) = [problem]
+
+struct QuantifierProblem
+    problem::Union{Problem, ConnectedProblem}
     qvs::Vector{QuantifiedVariable}
     p::Int
     n::Int
@@ -55,6 +72,7 @@ end
 
 function QuantifierProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
     @assert length(qvs) % 2 == 0 "Quantifier variables should be in pairs of (quantifier, index)."
+    problem = Problem(f, Df)
     for i in 1:2:length(qvs)
         quantifier = qvs[i]
         idx = qvs[i+1]
@@ -68,7 +86,7 @@ function QuantifierProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
             error("""Invalid quantifier: qvs[$(i+1)], "$(idx)", should be an integer.""")
         end
     end
-    return QuantifierProblem(f, Df, quantifier_variables, p, n)
+    return QuantifierProblem(problem, quantifier_variables, p, n)
 end
 
 function quantifier(qe::QuantifierProblem, dim::Int)

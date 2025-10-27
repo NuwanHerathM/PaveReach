@@ -19,7 +19,8 @@ function create_is_in_1(qe::QuantifierProblem, intervals::AbstractVector{Interva
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Forall, i) for i in 1:length(X)]..., qe.qvs...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        R_inner, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
+        problem = qe.problem
+        R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
         return interval(0, 0) ⊆ R_inner[1]
     end
 end
@@ -30,8 +31,9 @@ function create_is_in_2(qe::QuantifierProblem, intervals::AbstractVector{Interva
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         Z_minus = interval(-pseudo_infinity, intervals[end].lo - ϵ)
         Z_plus = interval(intervals[end].hi + ϵ, pseudo_infinity)
-        _, R_outer_minus = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
-        _, R_outer_plus = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
+        problem = qe.problem
+        _, R_outer_minus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
+        _, R_outer_plus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
         return interval(0, 0) ⊈ R_outer_minus[1] && interval(0, 0) ⊈ R_outer_plus[1]
     end
 end
@@ -56,7 +58,8 @@ function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{Interv
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        _, R_outer = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
+        problem = qe.problem
+        _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
         return  interval(0,0) ⊈ R_outer[1]
     end
 end
@@ -67,8 +70,9 @@ function create_is_out_2(qe::QuantifierProblem, intervals::AbstractVector{Interv
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         Z_minus = interval(-pseudo_infinity, intervals[end].lo - ϵ)
         Z_plus = interval(intervals[end].hi + ϵ, pseudo_infinity)
-        R_inner_minus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
-        R_inner_plus, _ = QEapprox_o0(qe.f, qe.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
+        problem = qe.problem
+        R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
+        R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
         return interval(0, 0) ⊆ R_inner_minus[1] || interval(0, 0) ⊆ R_inner_plus[1]
     end
 end
@@ -83,10 +87,12 @@ end
 
 function is_member(cell::AbstractCell, X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
     @match typeof(cell) begin
-        $CellEnd      => return cell.is_member(X)
-        $AndCellStart => return all(child -> is_member(child, X), children(cell))
-        $AndCell      => return all(child -> is_member(child, X), children(cell))
-        _             => return any(child -> is_member(child, X), children(cell))
+        $ConjunctionCell => return all(child -> is_member(child, X), children(cell))
+        $DisjunctionCell => return any(child -> is_member(child, X), children(cell))
+        $CellEnd         => return cell.is_member(X)
+        $AndCellStart    => return all(child -> is_member(child, X), children(cell))
+        $AndCell         => return all(child -> is_member(child, X), children(cell))
+        _                => return any(child -> is_member(child, X), children(cell))
     end
 end
 
@@ -221,28 +227,44 @@ function make_out_pz_2(intervals, qe)
     return root_out
 end
 
+function make_pz(intervals, qe, make_pz_ab, make_in_pz_a, make_out_pz_b)
+    if isa(qe.problem, AndProblem)
+        sub_qes = [QuantifierProblem(problem, qe.qvs, qe.p, qe.n) for problem in problems(qe.problem)]
+        pzs = [make_pz_ab(intervals, sub_qe) for sub_qe in sub_qes]
+        pzs_in = first.(pzs)
+        pzs_out = last.(pzs)
+        pz_in = ConjunctionCell(pzs_in)
+        pz_out = DisjunctionCell(pzs_out)
+        return (pz_in, pz_out)
+    elseif isa(qe.problem, OrProblem)
+        sub_qes = [QuantifierProblem(problem, qe.qvs, qe.p, qe.n) for problem in problems(qe.problem)]
+        pzs = [make_pz_ab(intervals, sub_qe) for sub_qe in sub_qes]
+        pzs_in = first.(pzs)
+        pzs_out = last.(pzs)
+        pz_in = DisjunctionCell(pzs_in)
+        pz_out = ConjunctionCell(pzs_out)
+        return (pz_in, pz_out)
+    else
+        pz_in = make_in_pz_a(intervals, qe)
+        pz_out = make_out_pz_b(intervals, qe)
+        return (pz_in, pz_out)
+    end
+end
+
 function make_pz_11(intervals, qe)
-    p_in = make_in_pz_1(intervals, qe)
-    p_out = make_out_pz_1(intervals, qe)
-    return (p_in, p_out)
+    return make_pz(intervals, qe, make_pz_11, make_in_pz_1, make_out_pz_1)
 end
 
 function make_pz_12(intervals, qe)
-    p_in = make_in_pz_1(intervals, qe)
-    p_out = make_out_pz_2(intervals, qe)
-    return (p_in, p_out)
+    return make_pz(intervals, qe, make_pz_12, make_in_pz_1, make_out_pz_2)
 end
 
 function make_pz_21(intervals, qe)
-    p_in = make_in_pz_2(intervals, qe)
-    p_out = make_out_pz_1(intervals, qe)
-    return (p_in, p_out)
+    return make_pz(intervals, qe, make_pz_21, make_in_pz_2, make_out_pz_1)
 end
 
 function make_pz_22(intervals, qe)
-    p_in = make_in_pz_2(intervals, qe)
-    p_out = make_out_pz_2(intervals, qe)
-    return (p_in, p_out)
+    return make_pz(intervals, qe, make_pz_22, make_in_pz_2, make_out_pz_2)
 end
 
 # function make_in_paving(intervals, qe)
@@ -343,19 +365,23 @@ function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0:
     return (inn, out, delta)
 end
 
-function pave_11(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_11(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+    p_in_0, p_out_0 = make_pz_11(intervals, qe)
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_1!, ratio, precision_factor)
 end
 
-function pave_12(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_12(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+    p_in_0, p_out_0 = make_pz_12(intervals, qe)
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_2!, ratio, precision_factor)
 end
 
-function pave_21(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_21(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+    p_in_0, p_out_0 = make_pz_21(intervals, qe)
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_1!, ratio, precision_factor)
 end
 
-function pave_22(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave_22(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+    p_in_0, p_out_0 = make_pz_22(intervals, qe)
     return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_2!, ratio, precision_factor)
 end
 
@@ -379,6 +405,13 @@ function bisect!(root::CellStart, qe, create_is_member)
     push!(candidate.parent, intervals_1, idx, get_constructors(root), is_member_1)
     push!(candidate.parent, intervals_2, idx, get_constructors(root), is_member_2)
     remove!(candidate)
+end
+
+function bisect!(root::ConnectiveCell, qe, create_is_member)
+    for (child, sub_problem) in zip(children(root), problems(qe.problem))
+        sub_qe = QuantifierProblem(sub_problem, qe.qvs, qe.p, qe.n)
+        bisect!(child, sub_qe, create_is_member)
+    end
 end
 
 function bisect_in_1!(cell::CellStart, qe::QuantifierProblem)

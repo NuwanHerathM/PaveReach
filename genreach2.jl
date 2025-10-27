@@ -279,14 +279,11 @@ function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
 
   radii = [IntervalArithmetic.radius(input[i]) for i=1:p]
   input_center = [mid(input[i]) for i=1:p]
-  # println(radii)
    
   for j in 1:n
      c = Base.invokelatest(g_fun[j],input_center)
      range_Dg = Base.invokelatest(Dg_fun[j],input)
 
-    #  println(range_Dg)
-   
      outer = interval(c,c)
 
     for i = 2p-1:-2:1

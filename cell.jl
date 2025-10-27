@@ -1,4 +1,5 @@
 using AbstractTrees
+using Match
 
 abstract type AbstractCell end
 
@@ -28,17 +29,33 @@ struct AndCellStart <: AbstractCell
     children::Vector{AbstractCell}
 end
 
-CellStart = Union{OrCellStart, AndCellStart}
-
 struct CellEnd <: AbstractCell
     interval::IntervalArithmetic.Interval{T} where T<:Number
     parent::AbstractCell
     is_member::Function
 end
 
+struct ConjunctionCell <: AbstractCell
+    children::Vector{AbstractCell}
+end
+
+struct DisjunctionCell <: AbstractCell
+    children::Vector{AbstractCell}
+end
+
+ConnectiveCell = Union{ConjunctionCell, DisjunctionCell}
+
+CellStart = Union{OrCellStart, AndCellStart, ConnectiveCell}
+
 AbstractTrees.children(cell::AbstractCell) = isa(cell, CellEnd) ? [] : isa(cell, AtomicCell) ? [cell.child] : cell.children
 AbstractTrees.parent(cell::AbstractCell) = isa(cell, CellStart) ? nothing : cell.parent
-AbstractTrees.nodevalue(cell::AbstractCell) = isa(cell, CellStart) ? emptyinterval() : cell.interval, typeof(cell)
+AbstractTrees.nodevalue(cell::AbstractCell) = @match typeof(cell) begin
+    $ConjunctionCell => "∧"
+    $DisjunctionCell => "∨"
+    $AndCellStart    => (emptyinterval(), typeof(cell))
+    $OrCellStart     => (emptyinterval(), typeof(cell))
+    _                => (cell.interval, typeof(cell))
+    end
 isleaf(cell::AbstractCell) = isa(cell, CellEnd)
 AbstractTrees.isroot(cell::AbstractCell) = isa(cell, CellStart)
 
@@ -161,10 +178,12 @@ end
 
 function diam(cell::AbstractCell)
     @match typeof(cell) begin
-        $CellEnd      => return IntervalArithmetic.diam(cell.interval)
-        $AtomicCell   => return maximum(diam.(children(cell)))
-        $OrCellStart  => return maximum(diam.(children(cell)))
-        $AndCellStart => return maximum(diam.(children(cell)))
+        $CellEnd         => return IntervalArithmetic.diam(cell.interval)
+        $AtomicCell      => return maximum(diam.(children(cell)))
+        $OrCellStart     => return maximum(diam.(children(cell)))
+        $AndCellStart    => return maximum(diam.(children(cell)))
+        $ConjunctionCell => return maximum(diam.(children(cell)))
+        $DisjunctionCell => return maximum(diam.(children(cell)))
         _             => return maximum([IntervalArithmetic.diam(cell.interval), diam.(children(cell))...])
     end
 end
