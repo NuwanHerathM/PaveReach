@@ -50,7 +50,8 @@ end
         @variables x[1:p]
         f_num = [x[1]+x[2]-x[3]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-        global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 2), (Exists, 3)], p, n)
+        problem = Problem(f_fun, Df_fun)
+        global qe = QuantifierProblem(problem, [(Exists, 2), (Exists, 3)], p, n)
         global X_0 = IntervalBox(interval(-10, 10))
         Z = interval(3, 4)
         global intervals = [interval(2, 8), Z]
@@ -62,7 +63,8 @@ end
         @variables x[1:p]
         f_num = [x[1]^2+x[2]^2-x[3]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-        global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 2), (Exists, 3)], p, n)
+        problem = Problem(f_fun, Df_fun)
+        global qe = QuantifierProblem(problem, [(Exists, 2), (Exists, 3)], p, n)
         global X_0 = IntervalBox(interval(-10, 10))
         Z = interval(3, 5)
         global intervals = [interval(-3, 3), Z]
@@ -74,7 +76,8 @@ end
         @variables x[1:p]
         f_num = [x[1]^2+x[2]^2+2*x[1]*x[2]-20*x[1]-20x[2]+100-x[3]-x[4]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 2), (Exists, 4)], p, n)
+        problem = Problem(f_fun, Df_fun)
+        global qe = QuantifierProblem(problem, [(Forall, 3), (Exists, 2), (Exists, 4)], p, n)
         global X_0 = IntervalBox(interval(0, 6))
         Z = interval(0, 0)
         global intervals = [interval(2, 8), interval(6, 8), Z]
@@ -86,7 +89,8 @@ end
         @variables x[1:p]
         f_num = [x[1]^2 + x[2]^2 - x[3]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-        global qe = QuantifierProblem(f_fun, Df_fun, [(Exists, 3)], p, n)
+        problem = Problem(f_fun, Df_fun)
+        global qe = QuantifierProblem(problem, [(Exists, 3)], p, n)
         global X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
         Z = interval(0, 16)
         global intervals = [Z]
@@ -98,7 +102,8 @@ end
         @variables x[1:p]
         f_num = [x[3]*x[1] + x[4] - x[5]*x[1] - x[6]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 4), (Exists, 5), (Exists, 6)], p, n)
+        problem = Problem(f_fun, Df_fun)
+        global qe = QuantifierProblem(problem, [(Forall, 3), (Exists, 4), (Exists, 5), (Exists, 6)], p, n)
         global X_0 = IntervalBox([interval(-1, 1), interval(0, 5)])
         Z = interval(0, 0)
         global intervals = [interval(0, 1), interval(-1, 1), interval(0, 1000), Z]
@@ -110,13 +115,17 @@ end
         @variables x[1:p]
         f_num = [(x[3]*(x[2] - 1) + 1)^2 - x[5]*(x[2] - 1) - x[6]]
         f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-        global qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 3), (Exists, 4), (Exists, 5), (Exists, 6)], p, n)
+        problem = Problem(f_fun, Df_fun)
+        global qe = QuantifierProblem(problem, [(Forall, 3), (Exists, 4), (Exists, 5), (Exists, 6)], p, n)
         global X_0 = IntervalBox([interval(-1, 1), interval(0, 5)])
         Z = interval(0, 0)
         global intervals = [interval(0, 1), interval(-1, 1), interval(0, 1000), Z]
     end
     _ => error("Invalid choice")
 end
+
+using TimerOutputs
+const to = TimerOutput()
 
 eps = 0.5
 # @btime begin
@@ -127,12 +136,15 @@ eps = 0.5
     # global p_0 = make_membershipcell_root(box, is_in, is_out)
 # p_in_0 = make_in_paving(intervals, qe)
 # p_out_0 = make_out_paving(intervals, qe)
-p_in_0, p_out_0 = make_pz_11(intervals, qe)
-inn, out, delta = pave_11(p_in_0, p_out_0, qe, X_0, eps, is_refined=false)
+# p_in_0, p_out_0 = make_pz_11(intervals, qe)
+inn, out, delta = pave_11(qe, X_0, intervals, eps, is_refined=true)
 # end
 
 
 print_inn_out_delta(inn, out, delta)
+
+show(to)
+println()
 
 # Display the results on a plot if requested
 if parsed_args["display"]

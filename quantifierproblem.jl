@@ -66,6 +66,7 @@ problems(problem::Problem) = [problem]
 struct QuantifierProblem
     problem::Union{Problem, ConnectedProblem}
     qvs::Vector{QuantifiedVariable}
+    q
     p::Int
     n::Int
 end
@@ -86,7 +87,7 @@ function QuantifierProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
             error("""Invalid quantifier: qvs[$(i+1)], "$(idx)", should be an integer.""")
         end
     end
-    return QuantifierProblem(problem, quantifier_variables, p, n)
+    return QuantifierProblem(problem, quantifier_variables, [quantifier_variables], p, n)
 end
 
 function quantifier(qe::QuantifierProblem, dim::Int)

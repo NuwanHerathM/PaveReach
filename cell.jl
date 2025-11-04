@@ -95,6 +95,14 @@ function depth(cell::AbstractCell)
     end
 end
 
+function size(cell::AbstractCell)
+    if isleaf(cell)
+        return 1
+    else
+        return 1 + sum(size.(children(cell)))
+    end
+end
+
 function get_constructors(cell::CellStart)
     constructors = []
     current = first(children(cell))

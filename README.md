@@ -1,5 +1,24 @@
 # PaveReach
 
+## Dependencies
+
+GenReach
+IntervalArithmetic
+LazySets
+Polyhedra
+StaticArrays
+Symbolics
+CDDLib
+
+PaveReach
+Match
+TimerOutputs
+Plots
+PyPlot
+<!-- PythonPlot (to be added after PyPlot) -->
+ConstructionBase
+ArgParse
+
 ## Quick start
 
 Try the running example from the article (Example 3.1):

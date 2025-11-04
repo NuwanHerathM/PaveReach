@@ -26,14 +26,15 @@ parsed_args = parse_commandline()
 
 
 n = 1                                                   # 1
-p = 3                                                   # Dimension of the domain of f
-@variables x[1:p]                                       # x[1] := x_1, x[2] := x_2, x[3] := z
-f_num = [Symbolics.sin(x[1]) + x[2]^2 - x[3]]           # f(x, p_1, z) = x_1^2 + x_2^2 - z
-f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+p = 5                                                   # Dimension of the domain of f
+P_x(t) = sin(t+π/4) + 2*sin(3*t-3*π/4-1) + sin(3.2*t+π/4-0.9)
+P_y(t) = cos(t+π/4) + 2*cos(3*t-3*π/4-1) + cos(3.2*t+π/4-0.9)
+f_fun = [x -> sqrt((x[1] - P_x(x[3]))^2 + (x[2] - P_y(x[3]))^2) - x[4] - x[5]]               # function f
+Df_fun = [x -> [(x[1] - sin(π/4 + x[3]) - 2sin(-3*π/4 -1 + 3x[3]) - sin(π/4 -0.9 + 3.2x[3])) / sqrt((x[1] - sin(π/4 + x[3]) - 2sin(-3*π/4 -1 + 3x[3]) - sin(π/4 -0.9 + 3.2x[3]))^2 + (x[2] + cos(π/4 -0.9 + 3.2x[3]) - cos(π/4 + x[3]) + 2cos(-3*π/4 -1 + 3x[3]))^2) (x[2] + cos(π/4 -0.9 + 3.2x[3]) - cos(π/4 + x[3]) + 2cos(-3*π/4 -1 + 3x[3])) / sqrt((x[1] - sin(π/4 + x[3]) - 2sin(-3*π/4 -1 + 3x[3]) - sin(π/4 -0.9 + 3.2x[3]))^2 + (x[2] + cos(π/4 -0.9 + 3.2x[3]) - cos(π/4 + x[3]) + 2cos(-3*π/4 -1 + 3x[3]))^2) (2(x[1] - sin(π/4 + x[3]) - 2sin(-3*π/4 -1 + 3x[3]) - sin(π/4 -0.9 + 3.2x[3]))*(-3.2cos(π/4 -0.9 + 3.2x[3]) - cos(π/4 + x[3]) - 6cos(-3*π/4 -1 + 3x[3])) + 2(x[2] + cos(π/4 -0.9 + 3.2x[3]) - cos(π/4 + x[3]) + 2cos(-3*π/4 -1 + 3x[3]))*(sin(π/4 + x[3]) - 6sin(-3*π/4 -1 + 3x[3]) - 3.2sin(π/4 -0.9 + 3.2x[3]))) / (2sqrt((x[1] - sin(π/4 + x[3]) - 2sin(-3*π/4 -1 + 3x[3]) - sin(π/4 -0.9 + 3.2x[3]))^2 + (x[2] + cos(π/4 -0.9 + 3.2x[3]) - cos(π/4 + x[3]) + 2cos(-3*π/4 -1 + 3x[3]))^2)) -1 -1]]
 problem = Problem(f_fun, Df_fun)                        # problem := f, Df
-qe = QuantifierProblem(problem, [(Exists, 3)], p, n)    # problem, [∃ z], p, n
-X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))     # Domain to be paved X_0
-intervals = [interval(0, 16)]                           # z ∈ Z = [0, 16]
+qe = QuantifierProblem(problem, [(Forall, 3), (Exists, 4), (Exists, 5)], p, n)    # problem, [∃ z], p, n
+X_0 = IntervalBox(interval(0, 5), interval(0, 5))     # Domain to be paved X_0
+intervals = [interval(0, 2), interval(1,20), interval(0, 0)]                           # z ∈ Z = [0, 16]
 
 using TimerOutputs
 const to = TimerOutput()
@@ -45,8 +46,12 @@ eps = 0.1                                               # Precision
 print_inn_out_delta(inn, out, delta)
 
 # Show the timing results
-show(to)
-println()
+time_without = TimerOutputs.time(to["pave not refined"])
+time_with = TimerOutputs.time(to["pave refined"])
+speedup = time_without / time_with
+println(round(time_without / 10^9, digits=3), " seconds without refinement")
+println(round(time_with / 10^9, digits=3), " seconds with refinement")
+println(round(speedup, digits=2), " speedup due to refinement")
 
 # Display the results on a plot if requested
 if parsed_args["display"]

@@ -3,8 +3,9 @@
 using BenchmarkTools
 using IntervalArithmetic
 using Match
+using TimerOutputs
 
-using Plots; pythonplot()
+using Plots#; pyplot()
 
 include("cell.jl")
 include("quantifierproblem.jl")
@@ -19,22 +20,29 @@ function create_is_in_1(qe::QuantifierProblem, intervals::AbstractVector{Interva
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Forall, i) for i in 1:length(X)]..., qe.qvs...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
+        qs = [[[(Forall, i) for i in 1:length(X)]..., qe.q[j]...] for j in 1:qe.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
         problem = qe.problem
-        R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
-        return interval(0, 0) ⊆ R_inner[1]
+        @timeit to "approx" R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
+        if any(isempty, R_inner)
+            return false
+        end
+        return all(interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qe.n)
     end
 end
 
 function create_is_in_2(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, pseudo_infinity::Int=1000, ϵ::Float64=0.1)::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Exists, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-1])..., (Exists, qe.p)]
+        quantifiers = [[(Exists, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        Z_minus = interval(-pseudo_infinity, intervals[end].lo - ϵ)
-        Z_plus = interval(intervals[end].hi + ϵ, pseudo_infinity)
+        qs = [[[(Exists, i) for i in 1:length(X)]..., negation.(qe.q[j][1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...] for j in 1:qe.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
+        Z_minus = [interval(-pseudo_infinity, intervals[end-i].lo) for i in (qe.n-1):-1:0]
+        Z_plus = [interval(intervals[end-i].hi, pseudo_infinity) for i in (qe.n-1):-1:0]
         problem = qe.problem
-        _, R_outer_minus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
-        _, R_outer_plus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
-        return interval(0, 0) ⊈ R_outer_minus[1] && interval(0, 0) ⊈ R_outer_plus[1]
+        _, R_outer_minus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_minus...])
+        _, R_outer_plus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_plus...])
+        return any([interval(0, 0) ⊈ interval(min(R_outer_minus[i]), max(R_outer_minus[i])) for i in 1:qe.n]) && any([interval(0, 0) ⊈ interval(min(R_outer_plus[i]), max(R_outer_plus[i])) for i in 1:qe.n])
     end
 end
 
@@ -56,24 +64,28 @@ end
 """
 function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs...]
-        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        problem = qe.problem
-        _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals...])
-        return  interval(0,0) ⊈ R_outer[1]
+        @timeit to "quantifiers" quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs...]
+        @timeit to "dirty quantifiers" dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
+        qs = [[[(Exists, i) for i in 1:length(X)]..., qe.q[j]...] for j in 1:qe.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
+        @timeit to "problem" problem = qe.problem
+        @timeit to "approx" _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
+        return  @timeit to "test" any([interval(0,0) ⊈ interval(min(R_outer[i]), max(R_outer[i])) for i in 1:qe.n])
     end
 end
 
 function create_is_out_2(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, pseudo_infinity::Int=1000, ϵ::Float64=0.1)::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-1])..., (Exists, qe.p)]
+        quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        Z_minus = interval(-pseudo_infinity, intervals[end].lo - ϵ)
-        Z_plus = interval(intervals[end].hi + ϵ, pseudo_infinity)
+        qs = [[[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...] for j in 1:qe.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
+        Z_minus = [interval(-pseudo_infinity, intervals[end-i].lo - ϵ) for i in (qe.n-1):-1:0]
+        Z_plus = [interval(intervals[end-i].hi + ϵ, pseudo_infinity) for i in (qe.n-1):-1:0]
         problem = qe.problem
-        R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_minus])
-        R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, [dirty_quantifiers for i=1:qe.n], qe.p, qe.n, [X.v..., intervals[1:end-1]..., Z_plus])
-        return interval(0, 0) ⊆ R_inner_minus[1] || interval(0, 0) ⊆ R_inner_plus[1]
+        R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_minus...])
+        R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_plus...])
+        return all([interval(0, 0) ⊆ interval(min(R_inner_minus[i]), max(R_inner_minus[i])) for i in 1:qe.n]) || all([interval(0, 0) ⊆ interval(min(R_inner_plus[i]), max(R_inner_plus[i])) for i in 1:qe.n])
     end
 end
 
@@ -89,7 +101,7 @@ function is_member(cell::AbstractCell, X::IntervalArithmetic.IntervalBox{N, T}) 
     @match typeof(cell) begin
         $ConjunctionCell => return all(child -> is_member(child, X), children(cell))
         $DisjunctionCell => return any(child -> is_member(child, X), children(cell))
-        $CellEnd         => return cell.is_member(X)
+        $CellEnd         => return @timeit to "is_member" cell.is_member(X)
         $AndCellStart    => return all(child -> is_member(child, X), children(cell))
         $AndCell         => return all(child -> is_member(child, X), children(cell))
         _                => return any(child -> is_member(child, X), children(cell))
@@ -300,7 +312,7 @@ end
 #     return make_paving(permuted_intervals, quantifiers, is_out)
 # end
 
-function pave(is_in::Function, is_out::Function, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64)::Tuple{Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}, Vector{IntervalArithmetic.Interval{T}}} where {T<:Number}
+function pave(is_in::Function, is_out::Function, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     inn = []
     out = []
     delta = []
@@ -337,59 +349,70 @@ function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0:
     out = []
     delta = []
     list = [(p_in_0, p_out_0, X_0)]
+    n_in = 0
+    n_out = 0
+    n_delta = 0
     while !isempty(list)
         p_in, p_out, X = pop!(list)
-        if is_member(p_in, X)
+        # println(size(p_in))
+        if @timeit to "IN" is_member(p_in, X)
+            n_in += size(p_in) > size(p_in_0) ? 1 : 0
             push!(inn, X)
-        elseif is_member(p_out, X)
+        elseif @timeit to "OUT" is_member(p_out, X)
+            n_out += size(p_out) > size(p_out_0) ? 1 : 0
             push!(out, X)
         elseif IntervalArithmetic.diam(X) < ϵ
+            n_delta += 1
             push!(delta, X)
         else
-            max_diam = maximum(diam, [p_in, p_out])
-            if (!is_refined) || IntervalArithmetic.diam(X) > ratio * max_diam || max_diam < precision_factor * ϵ
-                X_1, X_2 = bisect(X, 0.5)
-                p_in_1 = deepcopy(p_in_0)
-                p_out_1 = deepcopy(p_out_0)
-                p_in_2 = deepcopy(p_in_0)
-                p_out_2 = deepcopy(p_out_0)
+            @timeit to "max" max_diam = maximum(diam, [p_in, p_out])
+            # println(max_diam)
+            # if (!is_refined) || (IntervalArithmetic.diam(X) > ratio * max_diam || max_diam < precision_factor * ϵ)
+            if is_refined && max_diam > IntervalArithmetic.diam(X)
+                @timeit to "bisect in" bisect_in!(p_in, qe)
+                @timeit to "bisect out" bisect_out!(p_out, qe)
+                push!(list, (p_in, p_out, X))
+            else
+                @timeit to "bisect" X_1, X_2 = bisect(X)
+                @timeit to "deepcopy" p_in_1 = deepcopy(p_in_0)
+                @timeit to "deepcopy" p_out_1 = deepcopy(p_out_0)
+                @timeit to "deepcopy" p_in_2 = deepcopy(p_in_0)
+                @timeit to "deepcopy" p_out_2 = deepcopy(p_out_0)
                 push!(list, (p_in_1, p_out_1, X_1))
                 push!(list, (p_in_2, p_out_2, X_2))
-            else
-                bisect_in!(p_in, qe)
-                bisect_out!(p_out, qe)
-                push!(list, (p_in, p_out, X))
             end
         end
     end
+    println("n_in: $n_in\nn_out: $n_out\nn_delta: $n_delta")
     return (inn, out, delta)
 end
 
 function pave_11(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    p_in_0, p_out_0 = make_pz_11(intervals, qe)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_1!, ratio, precision_factor)
+    @timeit to "pz init" p_in_0, p_out_0 = make_pz_11(intervals, qe)
+    # print_tree(p_in_0)
+    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_1!, ratio, precision_factor, is_refined=is_refined)
 end
 
 function pave_12(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     p_in_0, p_out_0 = make_pz_12(intervals, qe)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_2!, ratio, precision_factor)
+    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_2!, ratio, precision_factor, is_refined=is_refined)
 end
 
 function pave_21(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     p_in_0, p_out_0 = make_pz_21(intervals, qe)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_1!, ratio, precision_factor)
+    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_1!, ratio, precision_factor, is_refined=is_refined)
 end
 
 function pave_22(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     p_in_0, p_out_0 = make_pz_22(intervals, qe)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_2!, ratio, precision_factor)
+    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_2!, ratio, precision_factor, is_refined=is_refined)
 end
 
 function bisect!(root::CellStart, qe, create_is_member)
     candidate = largest_bisectable_cell(root)
 
     idx = depth(candidate)
-    interval_1, interval_2 = bisect(candidate.interval, 0.5)
+    interval_1, interval_2 = bisect(candidate.interval)
 
     initial_intervals = starting_intervals(root)
     intervals_1 = [i == idx ? interval_1 : initial_intervals[i] for i in 1:length(qe.qvs)]
@@ -476,17 +499,29 @@ function print_inn_out_delta(inn::Vector{IntervalArithmetic.IntervalBox{N, T}}, 
     end
 end
 
-function draw_lines(intervals, color)
-    ys = [0, 0]
+rectangle(p, q) = Shape([p[1],q[1],q[1],p[1]], [p[2],p[2],q[2],q[2]])
+
+function draw_lines(intervals, color, y)
     for interval in intervals
-        xs = [interval.lo, interval.hi]
-        plot!(xs, ys, linewidth=2, color=color, legend=:false)
+        p = [interval.lo, y-0.1]
+        q = [interval.hi, y+0.1]
+        plot!(rectangle(p,q), color=color, linecolor=nothing, legend=:false)
     end
 end
 
+function draw_rows(blocks, color)
+    n = length(blocks)
+    for i in 1:n
+        y = n - i
+        draw_lines(merge_intervals([box[1] for box in blocks[i]]), color, y)
+    end
+end
+
+draw_inn_lines(inns) = draw_rows(inns, :green)
+draw_out_lines(outs) = draw_rows(outs, :cyan)
+draw_delta_lines(deltas) = draw_rows(deltas, :yellow)
 
 function draw_rectangles(boxes, color)
-    rectangle(p, q) = Shape([p[1],q[1],q[1],p[1]], [p[2],p[2],q[2],q[2]])
     for box in boxes
         x_interval = box[1]
         y_interval = box[2]
@@ -496,34 +531,39 @@ function draw_rectangles(boxes, color)
     end
 end
 
-function display(X_0, inn, out, delta)
-    if isa(X_0, IntervalBox{1, <:Number})
-        ylims!((-0.1,0.1))
-        xticks!((X_0[1].lo:1:X_0[1].hi))
+draw_delta_rectangles(delta) = draw_rectangles(delta, :yellow)
+draw_inn_rectangles(inn) = draw_rectangles(inn, :green)
+draw_out_rectangles(out) = draw_rectangles(out, :cyan)
 
-        draw_delta_lines(delta) = draw_lines(merge_intervals([box[1] for box in delta]), :yellow)
-        draw_inn_lines(inn) = draw_lines(merge_intervals([box[1] for box in inn]), :green)
-        draw_out_lines(out) = draw_lines(merge_intervals([box[1] for box in out]), :cyan)
+function draw(X_0, inn, out, delta)
+    if isa(X_0, IntervalBox{1, <:Number})
+        xlabel!("x")
+        xticks!((X_0[1].lo:1:X_0[1].hi))
+        ylabel!("criteria: O_IN, O_OUT")
+        ylims!((-0.1,3.1))
+        yticks!([3:-1:0;], ["1,1", "1,2", "2,1", "2,2"])
 
         draw_delta_lines(delta)
         draw_inn_lines(inn)
         draw_out_lines(out)
-        gui()
     elseif isa(X_0, IntervalBox{2, <:Number})
         xs = X_0[1]
         ys = X_0[2]
         xlims!((xs.lo, xs.hi))
         ylims!((ys.lo, ys.hi))
 
-        draw_delta_rectangles(delta) = draw_rectangles(delta, :yellow)
-        draw_inn_rectangles(inn) = draw_rectangles(inn, :green)
-        draw_out_rectangles(out) = draw_rectangles(out, :cyan)
-
         draw_delta_rectangles(delta)
         draw_inn_rectangles(inn)
         draw_out_rectangles(out)
-        gui()
     else
         error("Plotting is only supported for 1D and 2D problems.")
     end
+end
+
+function volume(box::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
+    return prod(IntervalArithmetic.diam.(box))
+end
+
+function volume(boxes::Vector{IntervalArithmetic.IntervalBox{N, T}}) where {N, T<:Number}
+    return sum(volume.(boxes))
 end
