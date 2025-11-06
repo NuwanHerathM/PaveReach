@@ -306,14 +306,13 @@ function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
     inner = interval(c,c)
   
     for i = 2p-1:-2:1
-      # println(inner)
       if q[j][i] == "exists"
-         inner = inner+I(range_Dg,radii,q[j][i+1])
+        inner = inner+I(range_Dg,radii,q[j][i+1])
       else
-         inner = slash(inner,O(range_Dg,radii,q[j][i+1]))
-         if (inner==EmptySet(1))
+        inner = slash(inner,O(range_Dg,radii,q[j][i+1]))
+        if (inner==EmptySet(1))
           break
-         end
+        end
       end
     end
   
