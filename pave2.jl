@@ -106,13 +106,12 @@ increment!(indices, lengths, pos) = increment!(indices, lengths, pos, 0)
 
 function create_is_in_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Forall, i) for i in 1:length(X)]..., qe.qvs..., [(Exists, qe.p) for i in 1:qe.n]...]
+        quantifiers = [[(Forall, i) for i in 1:length(X)]..., qe.qvs..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qs = [[[(Forall, i) for i in 1:length(X)]..., qe.q[j]..., [(Exists, qe.p) for i in 1:qe.n]...] for j in 1:qe.n]
+        qs = [[[(Forall, i) for i in 1:length(X)]..., qe.q[j]..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...] for j in 1:qe.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(qs)
         problem = qe.problem
         R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
-        # println(R_inner)
         if any(isempty, R_inner)
             return false
         end
@@ -120,15 +119,39 @@ function create_is_in_1(qe::QuantifierProblem, intervals::AbstractVector{Interva
     end
 end
 
+function create_is_in_2(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, f_bounds::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+    return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
+        quantifiers = [[(Exists, i) for i in 1:length(X)]..., negation.(qe.qvs)..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...]
+        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
+        qs = [[[(Exists, i) for i in 1:length(X)]..., negation.(qe.q[j])..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...] for j in 1:qe.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
+        problem = qe.problem
+        G_minus = [interval(-∞, intervals[end-i].lo) ∩ f_bounds[end-i] for i in (qe.n-1):-1:0]
+        if any(isempty, G_minus)
+            test_minus = true
+        else
+            _, R_outer_minus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., G_minus...])
+            test_minus = any([interval(0, 0) ⊈ interval(min(R_outer_minus[i]), max(R_outer_minus[i])) for i in 1:qe.n])
+        end
+        G_plus = [interval(intervals[end-i].hi, ∞) ∩ f_bounds[end-i] for i in (qe.n-1):-1:0]
+        if any(isempty, G_plus)
+            test_plus = true
+        else
+            _, R_outer_plus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., G_plus...])
+            test_plus = any([interval(0, 0) ⊈ interval(min(R_outer_plus[i]), max(R_outer_plus[i])) for i in 1:qe.n])
+        end
+        return test_minus && test_plus
+    end
+end
+
 function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs..., [(Exists, qe.p) for i in 1:qe.n]...]
+        quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qs = [[[(Exists, i) for i in 1:length(X)]..., qe.q[j]..., [(Exists, qe.p) for i in 1:qe.n]...] for j in 1:qe.n]
+        qs = [[[(Exists, i) for i in 1:length(X)]..., qe.q[j]..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...] for j in 1:qe.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(qs)
         problem = qe.problem
         _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
-        # println(R_outer)
         if all(isempty, R_outer)
             return true
         end
@@ -136,7 +159,45 @@ function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{Interv
     end
 end
 
-function check_is_in(X_0, p_in, G, qe)
+function create_is_out_2(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}},  f_bounds::AbstractVector{IntervalArithmetic.Interval{T}}, ϵ::Float64=0.1)::Function where {T<:Number}
+    return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
+        quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs)..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...]
+        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
+        qs = [[[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs)..., [(Exists, qe.p-i) for i in (qe.n-1):-1:0]...] for j in 1:qe.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
+        problem = qe.problem
+        G_minus = [interval(-∞, intervals[end-i].lo - ϵ) ∩ f_bounds[end-i] for i in (qe.n-1):-1:0]
+        if any(isempty, G_minus)
+            test_minus = false
+        else
+            R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., G_minus...])
+            if any(isempty, R_inner_minus)
+                test_minus = false
+            else
+                test_minus = all([interval(0, 0) ⊆ interval(min(R_inner_minus[i]), max(R_inner_minus[i])) for i in 1:qe.n])
+            end
+        end
+        G_plus = [interval(intervals[end-i].hi + ϵ, ∞) ∩ f_bounds[end-i] for i in (qe.n-1):-1:0]
+        if any(isempty, G_plus)
+            test_plus = false
+        else
+            R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., G_plus...])
+            if any(isempty, R_inner_plus)
+                test_plus = false
+            else
+                test_plus = all([interval(0, 0) ⊆ interval(min(R_inner_plus[i]), max(R_inner_plus[i])) for i in 1:qe.n])
+            end
+        end
+        return test_minus || test_plus
+    end
+end
+
+function bounds(f, X, interval)
+    return [f[i]([X.v..., interval...]) for i in 1:length(f)]
+end
+
+function check_is_in(X_0, p_in, G, qe, criterion)
+    @assert criterion == 1 || criterion == 2
     pg_in = [p_in..., G...]
 
     indices_forall = [i for (q, i) in qe.qvs if q == Forall] .- length(X_0)
@@ -151,7 +212,13 @@ function check_is_in(X_0, p_in, G, qe)
         is_in_intersection = true
         while is_in_intersection && (isempty(indices_forall) || indices[indices_forall] <= lengths_pg_in[indices_forall])
             sub_interval = [pg_in[i][indices[i]] for i in 1:length(pg_in)]
-            is_in = create_is_in_1(qe, sub_interval)
+            if criterion == 1
+                is_in = create_is_in_1(qe, sub_interval)
+            end
+            if criterion == 2
+                f_bounds = bounds(qe.problem.f, X_0, sub_interval)
+                is_in = create_is_in_2(qe, sub_interval, f_bounds)
+            end
             is_in_intersection &= is_in(X_0)
             if isempty(indices_forall)
                 break
@@ -170,8 +237,11 @@ function check_is_in(X_0, p_in, G, qe)
     return is_in_union
 end
 
+check_is_in_1(X_0, p_in, G, qe) = check_is_in(X_0, p_in, G, qe, 1)
+check_is_in_2(X_0, p_in, G, qe) = check_is_in(X_0, p_in, G, qe, 2)
 
-function check_is_out(X_0, p_out, G, qe)
+function check_is_out(X_0, p_out, G, qe, criterion)
+    @assert criterion == 1 || criterion == 2
     pg_out = [p_out..., G...]
 
     indices_forall = [i for (q, i) in qe.qvs if q == Forall] .- length(X_0)
@@ -186,7 +256,13 @@ function check_is_out(X_0, p_out, G, qe)
         is_out_union = false
         while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths_pg_out[indices_forall])
             sub_interval = [pg_out[i][indices[i]] for i in 1:length(pg_out)]
-            is_out = create_is_out_1(qe, sub_interval)
+            if criterion == 1
+                is_out = create_is_out_1(qe, sub_interval)
+            end
+            if criterion == 2
+                f_bounds = bounds(qe.problem.f, X_0, sub_interval)
+                is_out = create_is_out_2(qe, sub_interval, f_bounds)
+            end
             is_out_union |= is_out(X_0)
             increment!(indices, lengths_pg_out, indices_forall)
             if isempty(indices_forall)
@@ -205,7 +281,10 @@ function check_is_out(X_0, p_out, G, qe)
     return is_out_intersection
 end
 
-function pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect)
+check_is_out_1(X_0, p_in, G, qe) = check_is_out(X_0, p_in, G, qe, 1)
+check_is_out_2(X_0, p_in, G, qe) = check_is_out(X_0, p_in, G, qe, 2)
+
+function pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in, check_is_out)
     @assert nand(is_refined, allow_normal_p_bisect) "Cannot have P refined and normal bisection on P."
     p_in_0 = deepcopy(p_in)
     p_out_0 = deepcopy(p_out)
@@ -270,6 +349,11 @@ function pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect)
     end
     return inn, out, delta
 end
+
+pave_11(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_1)
+pave_12(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_2)
+pave_21(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_1)
+pave_22(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_2)
 
 # Utils
 

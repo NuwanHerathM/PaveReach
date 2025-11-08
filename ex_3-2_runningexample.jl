@@ -22,7 +22,7 @@ if is_refined
     refine_in!(p_in, qe.qvs, ϵ, qe.p, qe.n)
     refine_out!(p_out, qe.qvs, ϵ, qe.p, qe.n)
 end
-inn, out, delta = pave(X_0, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect)
+inn, out, delta = pave_12(X_0, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect)
 
 println("Number of elements of inn: ", length(inn))
 println("Number of elements of out: ", length(out))
