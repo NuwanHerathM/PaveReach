@@ -1,11 +1,13 @@
 using IntervalArithmetic
-using TimerOutputs
+# using TimerOutputs
 using Plots
 
-const to = TimerOutput()
+# const to = TimerOutput()
 
 include("genreach2.jl")
 include("quantifierproblem.jl")
+
+# Paving
 
 function bisect_eps(interval, ϵ)
     parts = [interval]
@@ -23,7 +25,7 @@ end
 
 parts = bisect_eps(interval(0, 1), 0.1)
 
-function bisect_quantifier!(intervals, qvs, eps, n, quantifier)
+function bisect_eps_quantifier!(intervals, qvs, eps, p, n, quantifier)
     @assert sum(length.(intervals)) ==  length(intervals) "Each interval should be a single interval."
     pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
 
@@ -32,8 +34,8 @@ function bisect_quantifier!(intervals, qvs, eps, n, quantifier)
     end
 end
 
-bisect_exists!(intervals, qvs, eps, n) = bisect_quantifier!(intervals, qvs, eps, n, Exists)
-bisect_forall!(intervals, qvs, eps, n) = bisect_quantifier!(intervals, qvs, eps, n, Forall)
+bisect_eps_exists!(intervals, qvs, eps, p, n) = bisect_eps_quantifier!(intervals, qvs, eps, p, n, Exists)
+bisect_eps_forall!(intervals, qvs, eps, p, n) = bisect_eps_quantifier!(intervals, qvs, eps, p, n, Forall)
 
 function pointify_quantifier!(intervals, qvs, n, quantifier)
     pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
@@ -46,13 +48,13 @@ end
 pointify_exists!(intervals, qvs, n) = pointify_quantifier!(intervals, qvs, n, Exists)
 pointify_forall!(intervals, qvs, n) = pointify_quantifier!(intervals, qvs, n, Forall)
 
-function refine_in!(p_in, qvs, eps, n)
-    bisect_exists!(p_in, qvs, eps, n)
+function refine_in!(p_in, qvs, eps, p, n)
+    bisect_eps_exists!(p_in, qvs, eps, p, n)
     pointify_exists!(p_in, qvs, n)
 end
 
-function refine_out!(p_out, qvs, eps, n)
-    bisect_forall!(p_out, qvs, eps, n)
+function refine_out!(p_out, qvs, eps, p, n)
+    bisect_eps_forall!(p_out, qvs, eps, p,n)
     pointify_forall!(p_out, qvs, n)
 end
 
@@ -66,6 +68,22 @@ function bisect_largest!(intervals)
     end
     intervals[pos_max] = parts
 end
+
+function bisect_largest_quantifier!(intervals, qvs, p, n, quantifier)
+    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
+    diams = [if (i in pos_quantifier) IntervalArithmetic.diam(first(intervals[i])) else -1 end for i in 1:length(intervals)]
+    (_, pos_max) = findmax(diams)
+    parts = []
+    for interval in intervals[pos_max]
+        a, b = IntervalArithmetic.bisect(interval)
+        push!(parts, a)
+        push!(parts, b)
+    end
+    intervals[pos_max] = parts
+end
+
+bisect_largest_exists!(intervals, qvs, p, n) = bisect_largest_quantifier!(intervals, qvs, p, n, Exists)
+bisect_largest_forall!(intervals, qvs, p, n) = bisect_largest_quantifier!(intervals, qvs, p, n, Forall)
 
 function increment!(indices, lengths, pos, i)
     if length(pos) == 0
@@ -93,7 +111,8 @@ function create_is_in_1(qe::QuantifierProblem, intervals::AbstractVector{Interva
         qs = [[[(Forall, i) for i in 1:length(X)]..., qe.q[j]..., [(Exists, qe.p) for i in 1:qe.n]...] for j in 1:qe.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(qs)
         problem = qe.problem
-        @timeit to "approx" R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
+        R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
+        # println(R_inner)
         if any(isempty, R_inner)
             return false
         end
@@ -103,13 +122,17 @@ end
 
 function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        @timeit to "quantifiers" quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs..., [(Exists, qe.p) for i in 1:qe.n]...]
-        @timeit to "dirty quantifiers" dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
+        quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs..., [(Exists, qe.p) for i in 1:qe.n]...]
+        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         qs = [[[(Exists, i) for i in 1:length(X)]..., qe.q[j]..., [(Exists, qe.p) for i in 1:qe.n]...] for j in 1:qe.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(qs)
-        @timeit to "problem" problem = qe.problem
-        @timeit to "approx" _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
-        return  @timeit to "test" any([interval(0,0) ⊈ interval(min(R_outer[i]), max(R_outer[i])) for i in 1:qe.n])
+        problem = qe.problem
+        _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
+        # println(R_outer)
+        if all(isempty, R_outer)
+            return true
+        end
+        return  any([interval(0,0) ⊈ interval(min(R_outer[i]), max(R_outer[i])) for i in 1:qe.n if !isempty(R_outer[i])])
     end
 end
 
@@ -158,13 +181,13 @@ function check_is_out(X_0, p_out, G, qe)
     indices = [1 for i in 1:(length(p_in)+length(G))]
     lengths_pg_out = length.(pg_out)
     # println(lengths_pg_out)
-    is_out_union = true
-    while is_out_union && (isempty(indices_exists) || indices[indices_exists] <= lengths_pg_out[indices_exists])
-        is_out_intersection = false
-        while !is_out_intersection && (isempty(indices_forall) || indices[indices_forall] <= lengths_pg_out[indices_forall])
+    is_out_intersection = true
+    while is_out_intersection && (isempty(indices_exists) || indices[indices_exists] <= lengths_pg_out[indices_exists])
+        is_out_union = false
+        while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths_pg_out[indices_forall])
             sub_interval = [pg_out[i][indices[i]] for i in 1:length(pg_out)]
             is_out = create_is_out_1(qe, sub_interval)
-            is_out_intersection |= is_out(X_0)
+            is_out_union |= is_out(X_0)
             increment!(indices, lengths_pg_out, indices_forall)
             if isempty(indices_forall)
                 break
@@ -173,16 +196,17 @@ function check_is_out(X_0, p_out, G, qe)
         for i in indices_forall
             indices[i] = 1
         end
-        is_out_union &= is_out_intersection
+        is_out_intersection &= is_out_union
         increment!(indices, lengths_pg_out, indices_exists)
         if isempty(indices_exists)
             break
         end
     end
-    return is_out_union
+    return is_out_intersection
 end
 
-function pave(X, p_in, p_out, G, qe, ϵ, is_refined)
+function pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect)
+    @assert nand(is_refined, allow_normal_p_bisect) "Cannot have P refined and normal bisection on P."
     p_in_0 = deepcopy(p_in)
     p_out_0 = deepcopy(p_out)
     G_0 = deepcopy(G)
@@ -211,8 +235,30 @@ function pave(X, p_in, p_out, G, qe, ϵ, is_refined)
                     continue
                 end
                 if X_max < p_max
-                    bisect_largest!(p_in)
-                    bisect_largest!(p_out)
+                    # bisect_largest!(p_in)
+                    # bisect_largest!(p_out)
+                    bisect_largest_forall!(p_in, qe.qvs, qe.p, qe.n)
+                    bisect_largest_exists!(p_out, qe.qvs, qe.p, qe.n)
+                    push!(list, (X, p_in, p_out, G))
+                    continue
+                end
+            end
+            if allow_normal_p_bisect
+                indices_forall = [i for (q, i) in qe.qvs if q == Forall] .- length(X)
+                indices_exists = [i for (q, i) in qe.qvs if q == Exists] .- length(X)
+                p_in_max = isempty(indices_exists) ? -1 : maximum(IntervalArithmetic.diam.(first.(p_in[indices_exists])))
+                p_out_max = isempty(indices_forall) ? -1 : maximum(IntervalArithmetic.diam.(first.(p_out[indices_forall])))
+                p_max = maximum((p_in_max, p_out_max))
+                G_max = maximum(IntervalArithmetic.diam.(first.(G)))
+                X_max = IntervalArithmetic.diam(X)
+                if X_max < p_max && p_max < G_max
+                    bisect_largest!(G)
+                    push!(list, (X, p_in, p_out, G))
+                    continue
+                end
+                if X_max < p_max
+                    bisect_largest_exists!(p_in, qe.qvs, qe.p, qe.n)
+                    bisect_largest_forall!(p_out, qe.qvs, qe.p, qe.n)
                     push!(list, (X, p_in, p_out, G))
                     continue
                 end
@@ -225,43 +271,18 @@ function pave(X, p_in, p_out, G, qe, ϵ, is_refined)
     return inn, out, delta
 end
 
+# Utils
+
 function volume_box(box)
     return prod(IntervalArithmetic.diam.(box))
 end
 
 function volume_boxes(boxes)
+    if isempty(boxes)
+        return 0
+    end
     return sum(volume_box.(boxes))
 end
-
-n = 1
-p = 3
-@variables x[1:p]
-f_num = [x[2]^2-(x[1]-1)*(x[1]-2)*(x[1]-3)-x[3]]
-f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-problem = Problem(f_fun, Df_fun) 
-qe = QuantifierProblem(problem, [(Forall, 2)], [[(Forall, 2)]], p, n)
-X_0 = IntervalBox(interval(0, 5))
-# X_0 = IntervalBox(interval(2,2.1))
-# X_0 = IntervalBox(interval(0,0.1))
-# X_0 = IntervalBox(interval(1,1.1))
-p_in = [[interval(0, 1/4)]]
-p_out = deepcopy(p_in)
-G = [[interval(-1/4, 1/4)]]
-
-is_refined = false
-
-ϵ = 0.05
-if is_refined
-    refine_in!(p_in, qe.qvs, ϵ, qe.n)
-    refine_out!(p_out, qe.qvs, ϵ, qe.n)
-end
-inn, out, delta = pave(X_0, p_in, p_out, G, qe, ϵ, is_refined)
-
-Base.println("Number of elements of inn: ", length(inn))
-Base.println("Number of elements of out: ", length(out))
-Base.println("Number of elements of delta: ", length(delta))
-
-println(round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 function merge_intervals(intervals)
     disconnected = deepcopy(intervals)
@@ -314,13 +335,12 @@ draw_out_lines(outs) = draw_rows(outs, :cyan)
 draw_delta_lines(deltas) = draw_rows(deltas, :yellow)
 
 function draw(X_0, inn, out, delta)
+    default(size=(600,60), grid=false)
     xlabel!("x")
     xticks!((X_0[1].lo:1:X_0[1].hi))
+    yaxis!(false)
 
     draw_delta_lines(delta)
     draw_inn_lines(inn)
     draw_out_lines(out)
 end
-
-draw(X_0, [inn], [out], [delta])
-gui()
