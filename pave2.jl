@@ -26,7 +26,7 @@ end
 parts = bisect_eps(interval(0, 1), 0.1)
 
 function bisect_eps_quantifier!(intervals, qvs, eps, p, n, quantifier)
-    @assert sum(length.(intervals)) ==  length(intervals) "Each interval should be a single interval."
+    @assert sum(length.(intervals); init=0) ==  length(intervals) "Each interval should be a single interval."
     pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
 
     for i in pos_quantifier
@@ -58,16 +58,16 @@ function refine_out!(p_out, qvs, eps, p, n)
     pointify_forall!(p_out, qvs, n)
 end
 
-function bisect_largest!(intervals)
-    (_, pos_max) = findmax(IntervalArithmetic.diam.(first.(intervals)))
-    parts = []
-    for interval in intervals[pos_max]
-        a, b = IntervalArithmetic.bisect(interval)
-        push!(parts, a)
-        push!(parts, b)
-    end
-    intervals[pos_max] = parts
-end
+# function bisect_largest!(intervals)
+#     (_, pos_max) = findmax(IntervalArithmetic.diam.(first.(intervals)))
+#     parts = []
+#     for interval in intervals[pos_max]
+#         a, b = IntervalArithmetic.bisect(interval)
+#         push!(parts, a)
+#         push!(parts, b)
+#     end
+#     intervals[pos_max] = parts
+# end
 
 function bisect_largest_quantifier!(intervals, qvs, p, n, quantifier)
     pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
@@ -198,20 +198,19 @@ end
 
 function check_is_in(X_0, p_in, G, qe, criterion)
     @assert criterion == 1 || criterion == 2
-    pg_in = [p_in..., G...]
+    # pg_in = [p_in..., G...]
 
     indices_forall = [i for (q, i) in qe.qvs if q == Forall] .- length(X_0)
     indices_exists = [i for (q, i) in qe.qvs if q == Exists] .- length(X_0)
-    append!(indices_exists, (length(p_in)+1):(length(p_in)+length(G)))
+    # append!(indices_exists, (length(p_in)+1):(length(p_in)+length(G)))
 
-    indices = [1 for i in 1:(length(p_in)+length(G))]
-    lengths_pg_in = length.(pg_in)
-    # println(lengths_pg_in)
+    indices = [1 for i in 1:length(p_in)]
+    lengths = length.(p_in)
     is_in_union = false
-    while !is_in_union && (isempty(indices_exists) || indices[indices_exists] <= lengths_pg_in[indices_exists])
+    while !is_in_union && (isempty(indices_exists) || indices[indices_exists] <= lengths[indices_exists])
         is_in_intersection = true
-        while is_in_intersection && (isempty(indices_forall) || indices[indices_forall] <= lengths_pg_in[indices_forall])
-            sub_interval = [pg_in[i][indices[i]] for i in 1:length(pg_in)]
+        while is_in_intersection && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
+            sub_interval = [[p_in[i][indices[i]] for i in 1:length(p_in)]..., G...]
             if criterion == 1
                 is_in = create_is_in_1(qe, sub_interval)
             end
@@ -223,7 +222,7 @@ function check_is_in(X_0, p_in, G, qe, criterion)
             if isempty(indices_forall)
                 break
             end
-            increment!(indices, lengths_pg_in, indices_forall)
+            increment!(indices, lengths, indices_forall)
         end
         for i in indices_forall
             indices[i] = 1
@@ -232,7 +231,7 @@ function check_is_in(X_0, p_in, G, qe, criterion)
         if isempty(indices_exists)
             break
         end
-        increment!(indices, lengths_pg_in, indices_exists)
+        increment!(indices, lengths, indices_exists)
     end
     return is_in_union
 end
@@ -242,29 +241,28 @@ check_is_in_2(X_0, p_in, G, qe) = check_is_in(X_0, p_in, G, qe, 2)
 
 function check_is_out(X_0, p_out, G, qe, criterion)
     @assert criterion == 1 || criterion == 2
-    pg_out = [p_out..., G...]
+    # pg_in = [p_in..., G...]
 
     indices_forall = [i for (q, i) in qe.qvs if q == Forall] .- length(X_0)
     indices_exists = [i for (q, i) in qe.qvs if q == Exists] .- length(X_0)
-    append!(indices_exists, (length(p_in)+1):(length(p_in)+length(G)))
+    # append!(indices_exists, (length(p_in)+1):(length(p_in)+length(G)))
 
-    indices = [1 for i in 1:(length(p_in)+length(G))]
-    lengths_pg_out = length.(pg_out)
-    # println(lengths_pg_out)
+    indices = [1 for i in 1:length(p_in)]
+    lengths = length.(p_out)
     is_out_intersection = true
-    while is_out_intersection && (isempty(indices_exists) || indices[indices_exists] <= lengths_pg_out[indices_exists])
+    while is_out_intersection && (isempty(indices_exists) || indices[indices_exists] <= lengths[indices_exists])
         is_out_union = false
-        while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths_pg_out[indices_forall])
-            sub_interval = [pg_out[i][indices[i]] for i in 1:length(pg_out)]
+        while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
+            sub_interval = [[p_out[i][indices[i]] for i in 1:length(p_out)]..., G...]
             if criterion == 1
                 is_out = create_is_out_1(qe, sub_interval)
             end
             if criterion == 2
                 f_bounds = bounds(qe.problem.f, X_0, sub_interval)
-                is_out = create_is_out_2(qe, sub_interval, f_bounds)
+                is_out = create_is_out_2(qe, sub_interval, f_bounds, 0.00001)
             end
             is_out_union |= is_out(X_0)
-            increment!(indices, lengths_pg_out, indices_forall)
+            increment!(indices, lengths, indices_forall)
             if isempty(indices_forall)
                 break
             end
@@ -273,7 +271,7 @@ function check_is_out(X_0, p_out, G, qe, criterion)
             indices[i] = 1
         end
         is_out_intersection &= is_out_union
-        increment!(indices, lengths_pg_out, indices_exists)
+        increment!(indices, lengths, indices_exists)
         if isempty(indices_exists)
             break
         end
@@ -284,17 +282,17 @@ end
 check_is_out_1(X_0, p_in, G, qe) = check_is_out(X_0, p_in, G, qe, 1)
 check_is_out_2(X_0, p_in, G, qe) = check_is_out(X_0, p_in, G, qe, 2)
 
-function pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in, check_is_out)
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect, check_is_in, check_is_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+    inn = []
     @assert nand(is_refined, allow_normal_p_bisect) "Cannot have P refined and normal bisection on P."
     p_in_0 = deepcopy(p_in)
     p_out_0 = deepcopy(p_out)
-    G_0 = deepcopy(G)
     inn = []
     out = []
     delta = []
-    list = [(X, p_in, p_out, G)]
+    list = [(X, p_in, p_out)]
     while !isempty(list)
-        X, p_in, p_out, G = pop!(list)
+        X, p_in, p_out = pop!(list)
         if check_is_in(X, p_in, G, qe)
             push!(inn, X)
         elseif check_is_out(X, p_out, G, qe)
@@ -303,57 +301,51 @@ function pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, chec
             push!(delta, X)
         else
             if is_refined
-                p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in)))
-                p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out)))
+                p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in)); init=0.0)
+                p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out)); init=0.0)
                 p_max = maximum((p_in_max, p_out_max))
-                G_max = maximum(IntervalArithmetic.diam.(first.(G)))
                 X_max = IntervalArithmetic.diam(X)
-                if X_max < p_max && p_max < G_max
-                    bisect_largest!(G)
-                    push!(list, (X, p_in, p_out, G))
-                    continue
-                end
-                if X_max < p_max
-                    # bisect_largest!(p_in)
-                    # bisect_largest!(p_out)
-                    bisect_largest_forall!(p_in, qe.qvs, qe.p, qe.n)
-                    bisect_largest_exists!(p_out, qe.qvs, qe.p, qe.n)
-                    push!(list, (X, p_in, p_out, G))
+                if X_max * factor < p_max
+                    if X_max * factor < p_in_max
+                        bisect_largest_forall!(p_in, qe.qvs, qe.p, qe.n)
+                    end
+                    if X_max * factor < p_out_max
+                        bisect_largest_exists!(p_out, qe.qvs, qe.p, qe.n)
+                    end
+                    push!(list, (X, p_in, p_out))
                     continue
                 end
             end
             if allow_normal_p_bisect
                 indices_forall = [i for (q, i) in qe.qvs if q == Forall] .- length(X)
                 indices_exists = [i for (q, i) in qe.qvs if q == Exists] .- length(X)
-                p_in_max = isempty(indices_exists) ? -1 : maximum(IntervalArithmetic.diam.(first.(p_in[indices_exists])))
-                p_out_max = isempty(indices_forall) ? -1 : maximum(IntervalArithmetic.diam.(first.(p_out[indices_forall])))
+                p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in[indices_exists])); init=0.0)
+                p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out[indices_forall])); init=0.0)
                 p_max = maximum((p_in_max, p_out_max))
-                G_max = maximum(IntervalArithmetic.diam.(first.(G)))
                 X_max = IntervalArithmetic.diam(X)
-                if X_max < p_max && p_max < G_max
-                    bisect_largest!(G)
-                    push!(list, (X, p_in, p_out, G))
-                    continue
-                end
-                if X_max < p_max
-                    bisect_largest_exists!(p_in, qe.qvs, qe.p, qe.n)
-                    bisect_largest_forall!(p_out, qe.qvs, qe.p, qe.n)
-                    push!(list, (X, p_in, p_out, G))
+                if X_max * factor < p_max
+                    if X_max * factor < p_in_max
+                        bisect_largest_forall!(p_in, qe.qvs, qe.p, qe.n)
+                    end
+                    if X_max * factor < p_out_max
+                        bisect_largest_exists!(p_out, qe.qvs, qe.p, qe.n)
+                    end
+                    push!(list, (X, p_in, p_out))
                     continue
                 end
             end
             X_1, X_2 = bisect(X)
-            push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0), deepcopy(G_0)))
-            push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0), deepcopy(G_0)))
+            push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
+            push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
         end
     end
     return inn, out, delta
 end
 
-pave_11(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_1)
-pave_12(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_2)
-pave_21(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_1)
-pave_22(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_2)
+pave_11(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_1)
+pave_12(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_2)
+pave_21(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_1)
+pave_22(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_2)
 
 # Utils
 
@@ -398,33 +390,64 @@ end
 
 rectangle(p, q) = Shape([p[1],q[1],q[1],p[1]], [p[2],p[2],q[2],q[2]])
 
-function draw_lines(intervals, color, y)
+function draw_lines(pl, intervals, color)
     for interval in intervals
-        p = [interval.lo, y-0.1]
-        q = [interval.hi, y+0.1]
-        plot!(rectangle(p,q), color=color, linecolor=nothing, legend=:false)
+        p = [interval.lo, -0.1]
+        q = [interval.hi, 0.1]
+        plot!(pl, rectangle(p,q), color=color, linecolor=nothing, legend=:false)
     end
 end
 
-function draw_rows(blocks, color)
-    n = length(blocks)
-    for i in 1:n
-        y = n - i
-        draw_lines(merge_intervals([box[1] for box in blocks[i]]), color, y)
+function draw_rows(p, boxes, color)
+    draw_lines(p, merge_intervals([box[1] for box in boxes]), color)
+end
+
+draw_inn_lines(p, inns) = draw_rows(p, inns, :green)
+draw_out_lines(p, outs) = draw_rows(p, outs, :cyan)
+draw_delta_lines(p, deltas) = draw_rows(p, deltas, :yellow)
+
+function draw_rectangles(boxes, color)
+    for box in boxes
+        x_interval = box[1]
+        y_interval = box[2]
+        p = (x_interval.lo, y_interval.lo)
+        q = (x_interval.hi, y_interval.hi)
+        plot!(rectangle(p, q), color=color, legend=:false)
     end
 end
 
-draw_inn_lines(inns) = draw_rows(inns, :green)
-draw_out_lines(outs) = draw_rows(outs, :cyan)
-draw_delta_lines(deltas) = draw_rows(deltas, :yellow)
+draw_delta_rectangles(delta) = draw_rectangles(delta, :yellow)
+draw_inn_rectangles(inn) = draw_rectangles(inn, :green)
+draw_out_rectangles(out) = draw_rectangles(out, :cyan)
 
-function draw(X_0, inn, out, delta)
-    default(size=(600,60), grid=false)
-    xlabel!("x")
-    xticks!((X_0[1].lo:1:X_0[1].hi))
-    yaxis!(false)
+function draw(p, X_0, inn, out, delta)
+    if isa(X_0, IntervalBox{1, <:Number})
+        xticks!((X_0[1].lo:1:X_0[1].hi))
+        yaxis!(false)
 
-    draw_delta_lines(delta)
-    draw_inn_lines(inn)
-    draw_out_lines(out)
+        draw_delta_lines(p, delta)
+        draw_inn_lines(p, inn)
+        draw_out_lines(p, out)
+    elseif isa(X_0, IntervalBox{2, <:Number})
+        xs = X_0[1]
+        ys = X_0[2]
+        xlims!((xs.lo, xs.hi))
+        ylims!((ys.lo, ys.hi))
+
+        draw_delta_rectangles(delta)
+        draw_inn_rectangles(inn)
+        draw_out_rectangles(out)
+    else
+        error("Plotting is only supported for 1D and 2D problems.")
+    end
+end
+
+function print_inn_out_delta(inn, out, delta)
+    Base.println("Union of elements of inn: ", merge_intervals([box[1] for box in inn]))
+    Base.println("Union of elements of out: ", merge_intervals([box[1] for box in out]))
+    Base.println("Union of elements of delta: ", merge_intervals([box[1] for box in delta]))
+end
+
+function print_delta_width(delta)
+    Base.println("Width of delta regions: ", IntervalArithmetic.diam.(merge_intervals([box[1] for box in delta])))
 end
