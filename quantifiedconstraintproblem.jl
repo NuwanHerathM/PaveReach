@@ -63,15 +63,15 @@ end
 problems(problem::ConnectedProblem) = problem.problems
 problems(problem::Problem) = [problem]
 
-struct QuantifierProblem
+struct QuantifiedConstraintProblem
     problem::Union{Problem, ConnectedProblem}
     qvs::Vector{QuantifiedVariable}
-    q
+    qvs_relaxed::Vector{Vector{QuantifiedVariable}}
     p::Int
     n::Int
 end
 
-function QuantifierProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
+function QuantifiedConstraintProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
     @assert length(qvs) % 2 == 0 "Quantifier variables should be in pairs of (quantifier, index)."
     problem = Problem(f, Df)
     for i in 1:2:length(qvs)
@@ -87,13 +87,13 @@ function QuantifierProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
             error("""Invalid quantifier: qvs[$(i+1)], "$(idx)", should be an integer.""")
         end
     end
-    return QuantifierProblem(problem, quantifier_variables, [quantifier_variables], p, n)
+    return QuantifiedConstraintProblem(problem, quantifier_variables, [quantifier_variables], p, n)
 end
 
-function quantifier(qe::QuantifierProblem, dim::Int)
+function quantifier(qcp::QuantifiedConstraintProblem, dim::Int)
     i = 1
-    while index(qe.qvs[i]) != dim
+    while index(qcp.qvs[i]) != dim
         i += 1
     end
-    return quantifier(qe.qvs[i])
+    return quantifier(qcp.qvs[i])
 end

@@ -1,4 +1,4 @@
-include("pave2.jl")
+include("pave.jl")
 
 using Plots.PlotMeasures
 using LaTeXStrings
@@ -11,14 +11,14 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table s begin
-        "eps"
+        "eps_x"
             help = "epsilon for the paving"
             arg_type = Float64
             required = true
-        "factor"
-            help = "precision factor on the parameter"
+        "eps_p"
+            help = "epsilon for the parameters"
             arg_type = Float64
-            required = true
+            required = false
         "--x", "-x"
             help = "show problem for x"
             action = :store_true
@@ -34,12 +34,29 @@ function parse_commandline()
         "--subdivide", "-s"
             help = "subdivide the parameters"
             action = :store_true
+        "--save"
+            help = "save the output"
+            action = :store_true
     end
 
     return parse_args(s)
 end
 
 parsed_args = parse_commandline()
+# ------------------------------------------------------
+ϵ_x = parsed_args["eps_x"]
+ϵ_p = parsed_args["eps_p"]
+allow_exists_and_forall_bisection = parsed_args["refine"]
+allow_exists_or_forall_bisection = parsed_args["subdivide"]
+
+
+if isnothing(ϵ_p)
+    @assert !allow_exists_and_forall_bisection "eps_p was not provided. Refinement requires eps_p. Use --help for more information."
+    @assert !allow_exists_or_forall_bisection "eps_p was not provided. Subdivision requires eps_p. Use --help for more information."
+else
+    @warn "eps_p was provided, but will not be used. Provide options --refine or --subdivide in order to use eps_p."
+end
+@assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
 # ------------------------------------------------------
 
 filename = splitext(PROGRAM_FILE)[1]
@@ -54,7 +71,7 @@ if parsed_args["x"]
     f_fun_1, Df_fun_1 = build_function_f_Df(f_num_1, x, n, p)
     problem_1 = Problem(f_fun_1, Df_fun_1)
     qvs_1 = [(Exists, 2), (Forall, 3), (Exists, 4), (Exists, 5)]
-    qe = QuantifierProblem(problem_1, qvs_1, [qvs_1], p, n)
+    qcp = QuantifiedConstraintProblem(problem_1, qvs_1, [qvs_1], p, n)
     X_0 = IntervalBox(interval(-2, 4))
     p_in = [[interval(-10, 10)], [interval(-1, 1)], [interval(-1, 1)], [interval(0, 2)]]
     p_out = deepcopy(p_in)
@@ -71,7 +88,7 @@ if parsed_args["y"]
     f_fun_2, Df_fun_2 = build_function_f_Df(f_num_2, x, n, p)
     problem_2 = Problem(f_fun_2, Df_fun_2)
     qvs_2 = [(Exists, 6), (Exists, 2), (Exists, 4), (Exists, 3), (Exists, 6)]
-    qe = QuantifierProblem(problem_2, qvs_2, [qvs_2], p, n)
+    qcp = QuantifiedConstraintProblem(problem_2, qvs_2, [qvs_2], p, n)
     X_0 = IntervalBox(interval(-4, 4))
     p_in = [[interval(-10, 10)], [interval(-1, 1)], [interval(-20, 20)], [interval(-1, 1)], [interval(0, 2)]]
     p_out = deepcopy(p_in)
@@ -88,46 +105,43 @@ if parsed_args["theta"]
     f_fun_3, Df_fun_3 = build_function_f_Df(f_num_3, x, n, p)
     problem_3 = Problem(f_fun_3, Df_fun_3)
     qvs_3 = [(Exists, 3), (Exists, 2), (Exists, 4)]
-    qe = QuantifierProblem(problem_3, qvs_3, [qvs_3], p, n)
+    qcp = QuantifiedConstraintProblem(problem_3, qvs_3, [qvs_3], p, n)
     X_0 = IntervalBox(interval(-0.5, 0.5))
     p_in = [[interval(-20,20)], [interval(-1, 1)], [interval(0, 2)]] 
     p_out = deepcopy(p_in)
     G = [interval(0, 0)]
 end
 
-ϵ = parsed_args["eps"]
-factor = parsed_args["factor"]
-is_refined = parsed_args["refine"]
-allow_normal_p_bisect = parsed_args["subdivide"]
-if is_refined
-    refine_in!(p_in, qe.qvs, ϵ * factor, qe.p, qe.n)
-    refine_out!(p_out, qe.qvs, ϵ * factor, qe.p, qe.n)
+if allow_exists_and_forall_bisection
+    refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+    refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
 end
 
-println("ϵ = ", ϵ)
-println("factor: ", factor)
+println("ϵ_x = ", ϵ_x)
+println("ϵ_p = ", ϵ_p)
 
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qe, ϵ, factor, is_refined, allow_normal_p_bisect))
+@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection     ))
 print_inn_out_delta(inn, out, delta)
+println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
-p = plot()
-draw(p, X_0, inn, out, delta)
+if parsed_args["save"]
+    p = plot()
+    draw(p, X_0, inn, out, delta)
 
-
-if parsed_args["x"]
-    title!(p, L"$x$")
-    plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
-    savefig("$(filename)_$(eps)_x.png")
+    if parsed_args["x"]
+        title!(p, L"$x$")
+        plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
+        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_x.png"
+    end
+    if parsed_args["y"]
+        title!(p, L"$y$")
+        plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
+        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_y.png"
+    end
+    if parsed_args["theta"]
+        title!(p, L"$\theta$")
+        plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
+        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_theta.png"
+    end
+    savefig(outfile)
 end
-if parsed_args["y"]
-    title!(p, L"$y$")
-    plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
-    savefig("$(filename)_$(eps)_y.png")
-end
-if parsed_args["theta"]
-    title!(p, L"$\theta$")
-    plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
-    savefig("$(filename)_$(eps)_theta.png")
-end
-
-gui()

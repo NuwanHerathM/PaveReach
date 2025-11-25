@@ -1,465 +1,407 @@
-#!/usr/local/bin/julia
-
-using BenchmarkTools
 using IntervalArithmetic
-using Match
-using TimerOutputs
+using Plots
 
-using Plots#; pyplot()
+include("genreach2.jl")
+include("quantifiedconstraintproblem.jl")
 
-include("cell.jl")
-include("quantifierproblem.jl")
+# Paving
 
-"""
-    create_is_in(qe, intervals)
-# Arguments
-- `qe` quantier elimination problem QuantifierProblem
-- `intervals` = P_1, P_2, ..., Z
-"""
-function create_is_in_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function bisect_eps(interval, ϵ)
+    parts = [interval]
+    while diam(first(parts)) > ϵ
+        newparts = []
+        for current in parts
+            a, b = IntervalArithmetic.bisect(current)
+            push!(newparts, a)
+            push!(newparts, b)
+        end
+        parts = newparts
+    end
+    return parts
+end
+
+parts = bisect_eps(interval(0, 1), 0.1)
+
+function bisect_eps_quantifier!(intervals, qvs, eps, p, n, quantifier)
+    @assert sum(length.(intervals); init=0) ==  length(intervals) "Each interval should be a single interval."
+    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
+
+    for i in pos_quantifier
+        intervals[i] = bisect_eps(intervals[i][1], eps)
+    end
+end
+
+bisect_eps_exists!(intervals, qvs, eps, p, n) = bisect_eps_quantifier!(intervals, qvs, eps, p, n, Exists)
+bisect_eps_forall!(intervals, qvs, eps, p, n) = bisect_eps_quantifier!(intervals, qvs, eps, p, n, Forall)
+
+function pointify_quantifier!(intervals, qvs, n, quantifier)
+    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
+
+    for i in pos_quantifier
+        intervals[i] = interval.(mid.(intervals[i]))
+    end
+end
+
+pointify_exists!(intervals, qvs, n) = pointify_quantifier!(intervals, qvs, n, Exists)
+pointify_forall!(intervals, qvs, n) = pointify_quantifier!(intervals, qvs, n, Forall)
+
+function refine_in!(p_in, qvs, eps, p, n)
+    bisect_eps_exists!(p_in, qvs, eps, p, n)
+    pointify_exists!(p_in, qvs, n)
+end
+
+function refine_out!(p_out, qvs, eps, p, n)
+    bisect_eps_forall!(p_out, qvs, eps, p,n)
+    pointify_forall!(p_out, qvs, n)
+end
+
+# function bisect_largest!(intervals)
+#     (_, pos_max) = findmax(IntervalArithmetic.diam.(first.(intervals)))
+#     parts = []
+#     for interval in intervals[pos_max]
+#         a, b = IntervalArithmetic.bisect(interval)
+#         push!(parts, a)
+#         push!(parts, b)
+#     end
+#     intervals[pos_max] = parts
+# end
+
+function bisect_largest_quantifier!(intervals, qvs, p, n, quantifier)
+    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
+    diams = [if (i in pos_quantifier) IntervalArithmetic.diam(first(intervals[i])) else -1 end for i in 1:length(intervals)]
+    (_, pos_max) = findmax(diams)
+    parts = []
+    for interval in intervals[pos_max]
+        a, b = IntervalArithmetic.bisect(interval)
+        push!(parts, a)
+        push!(parts, b)
+    end
+    intervals[pos_max] = parts
+end
+
+bisect_largest_exists!(intervals, qvs, p, n) = bisect_largest_quantifier!(intervals, qvs, p, n, Exists)
+bisect_largest_forall!(intervals, qvs, p, n) = bisect_largest_quantifier!(intervals, qvs, p, n, Forall)
+
+function increment!(indices, lengths, pos, i)
+    if length(pos) == 0
+        return
+    end
+    if i == length(pos)
+        indices[pos[begin:end-1]] = lengths[pos[begin:end-1]]
+        indices[pos[end]] = lengths[pos[end]] + 1
+        return
+    end
+    indices[pos[end-i]] += 1
+    is_remainder = indices[pos[end-i]] > lengths[pos[end-i]]
+    if is_remainder
+        indices[pos[end-i]] = 1
+        increment!(indices, lengths, pos, i+1)
+    end
+end
+
+increment!(indices, lengths, pos) = increment!(indices, lengths, pos, 0)
+
+function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Forall, i) for i in 1:length(X)]..., qe.qvs...]
+        quantifiers = [[(Forall, i) for i in 1:length(X)]..., qcp.qvs..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qs = [[[(Forall, i) for i in 1:length(X)]..., qe.q[j]...] for j in 1:qe.n]
-        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
-        problem = qe.problem
-        @timeit to "approx" R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
+        quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]..., qcp.qvs_relaxed[j]..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
+        problem = qcp.problem
+        R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
         if any(isempty, R_inner)
             return false
         end
-        return all(interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qe.n)
+        return all(interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qcp.n)
     end
 end
 
-function create_is_in_2(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, pseudo_infinity::Int=1000, ϵ::Float64=0.1)::Function where {T<:Number}
+function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, f_bounds::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Exists, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...]
+        quantifiers = [[(Exists, i) for i in 1:length(X)]..., negation.(qcp.qvs)..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qs = [[[(Exists, i) for i in 1:length(X)]..., negation.(qe.q[j][1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...] for j in 1:qe.n]
-        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
-        Z_minus = [interval(-pseudo_infinity, intervals[end-i].lo) for i in (qe.n-1):-1:0]
-        Z_plus = [interval(intervals[end-i].hi, pseudo_infinity) for i in (qe.n-1):-1:0]
-        problem = qe.problem
-        _, R_outer_minus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_minus...])
-        _, R_outer_plus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_plus...])
-        return any([interval(0, 0) ⊈ interval(min(R_outer_minus[i]), max(R_outer_minus[i])) for i in 1:qe.n]) && any([interval(0, 0) ⊈ interval(min(R_outer_plus[i]), max(R_outer_plus[i])) for i in 1:qe.n])
+        quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]..., negation.(qcp.qvs_relaxed[j])..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
+        problem = qcp.problem
+        G_minus = [interval(-∞, intervals[end-i].lo) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
+        if any(isempty, G_minus)
+            test_minus = true
+        else
+            _, R_outer_minus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_minus...])
+            test_minus = any([interval(0, 0) ⊈ interval(min(R_outer_minus[i]), max(R_outer_minus[i])) for i in 1:qcp.n])
+        end
+        G_plus = [interval(intervals[end-i].hi, ∞) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
+        if any(isempty, G_plus)
+            test_plus = true
+        else
+            _, R_outer_plus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_plus...])
+            test_plus = any([interval(0, 0) ⊈ interval(min(R_outer_plus[i]), max(R_outer_plus[i])) for i in 1:qcp.n])
+        end
+        return test_minus && test_plus
     end
 end
 
-function create_is_in_1(qe::QuantifierProblem, box::IntervalBox)::Function
-    return create_is_in_1(qe, box.v)
-end
-
-function create_is_in_2(qe::QuantifierProblem, box::IntervalBox)::Function
-    return create_is_in_2(qe, box.v)
-end
-
-"""
-    create_is_out(qe, intervals, [pseudo_infinity, ϵ])
-# Arguments
-- `qe` quantifier elimination problem QuantifierProblem
-- `intervals` = P_1, P_2, ..., Z
-- `pseudo_infinity` a large number to represent infinity in the intervals
-- `ϵ` a small number to create a margin around the interval Z for its complement
-"""
-function create_is_out_1(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        @timeit to "quantifiers" quantifiers = [[(Exists, i) for i in 1:length(X)]..., qe.qvs...]
-        @timeit to "dirty quantifiers" dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qs = [[[(Exists, i) for i in 1:length(X)]..., qe.q[j]...] for j in 1:qe.n]
-        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
-        @timeit to "problem" problem = qe.problem
-        @timeit to "approx" _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals...])
-        return  @timeit to "test" any([interval(0,0) ⊈ interval(min(R_outer[i]), max(R_outer[i])) for i in 1:qe.n])
-    end
-end
-
-function create_is_out_2(qe::QuantifierProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, pseudo_infinity::Int=1000, ϵ::Float64=0.1)::Function where {T<:Number}
-    return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-        quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...]
+        quantifiers = [[(Exists, i) for i in 1:length(X)]..., qcp.qvs..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qs = [[[(Forall, i) for i in 1:length(X)]..., negation.(qe.qvs[1:end-qe.n])..., [(Exists, qe.p) for k in 1:qe.n]...] for j in 1:qe.n]
-        dirty_qs = quantifiedvariables2dirtyvariables.(qs)
-        Z_minus = [interval(-pseudo_infinity, intervals[end-i].lo - ϵ) for i in (qe.n-1):-1:0]
-        Z_plus = [interval(intervals[end-i].hi + ϵ, pseudo_infinity) for i in (qe.n-1):-1:0]
-        problem = qe.problem
-        R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_minus...])
-        R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qe.p, qe.n, [X.v..., intervals[1:end-qe.n]..., Z_plus...])
-        return all([interval(0, 0) ⊆ interval(min(R_inner_minus[i]), max(R_inner_minus[i])) for i in 1:qe.n]) || all([interval(0, 0) ⊆ interval(min(R_inner_plus[i]), max(R_inner_plus[i])) for i in 1:qe.n])
-    end
-end
-
-function create_is_out_1(qe::QuantifierProblem, box::IntervalBox)::Function
-    return create_is_out_1(qe, box.v)
-end
-
-function create_is_out_2(qe::QuantifierProblem, box::IntervalBox)::Function
-    return create_is_out_2(qe, box.v)
-end
-
-function is_member(cell::AbstractCell, X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-    @match typeof(cell) begin
-        $ConjunctionCell => return all(child -> is_member(child, X), children(cell))
-        $DisjunctionCell => return any(child -> is_member(child, X), children(cell))
-        $CellEnd         => return @timeit to "is_member" cell.is_member(X)
-        $AndCellStart    => return all(child -> is_member(child, X), children(cell))
-        $AndCell         => return all(child -> is_member(child, X), children(cell))
-        _                => return any(child -> is_member(child, X), children(cell))
-    end
-end
-
-function get_in_constructors_1(quantifiers)
-    constructors_in = []
-    is_first_forall = quantifiers[begin] == Forall
-    if is_first_forall
-        push!(constructors_in, AndCellStart)
-        quantifiers = quantifiers[2:end]
-        while quantifiers[begin] == Forall
-            push!(constructors_in, AndCell)
-            quantifiers = quantifiers[2:end]
+        quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]..., qcp.qvs_relaxed[j]..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
+        problem = qcp.problem
+        _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
+        if all(isempty, R_outer)
+            return true
         end
-    else
-        push!(constructors_in, OrCellStart)
-        quantifiers = quantifiers[2:end]
+        return  any([interval(0,0) ⊈ interval(min(R_outer[i]), max(R_outer[i])) for i in 1:qcp.n if !isempty(R_outer[i])])
     end
-    for quantifier in quantifiers
-        if quantifier == Exists
-            push!(constructors_in, OrCell)
+end
+
+function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}},  f_bounds::AbstractVector{IntervalArithmetic.Interval{T}}, ϵ::Float64=0.1)::Function where {T<:Number}
+    return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
+        quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qcp.qvs)..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
+        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
+        quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]..., negation.(qcp.qvs_relaxed[j])..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
+        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
+        problem = qcp.problem
+        G_minus = [interval(-∞, intervals[end-i].lo - ϵ) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
+        if any(isempty, G_minus)
+            test_minus = false
         else
-            push!(constructors_in, AtomicCell)
-        end
-    end
-    push!(constructors_in, CellEnd)
-    return constructors_in
-end
-
-function get_out_constructors_1(quantifiers)
-    constructors_out = []
-    is_first_forall = quantifiers[begin] == Forall
-    if is_first_forall
-        push!(constructors_out, OrCellStart)
-        quantifiers = quantifiers[2:end]
-        while quantifiers[begin] == Forall
-            push!(constructors_out, OrCell)
-            quantifiers = quantifiers[2:end]
-        end
-    else
-        push!(constructors_out, AndCellStart)
-        quantifiers = quantifiers[2:end]
-    end
-    for quantifier in quantifiers
-        if quantifier == Exists
-            push!(constructors_out, AndCell)
-        else
-            push!(constructors_out, AtomicCell)
-        end
-    end
-    push!(constructors_out, CellEnd)
-    return constructors_out
-end
-
-get_in_constructors_2 = get_out_constructors_1
-get_out_constructors_2 = get_in_constructors_1
-
-function make_pz_tree_from_constructors(constructors, intervals, is_member)
-    root = constructors[begin]()
-    child = make_pz_tree_from_constructors(intervals, root, constructors[2:end], is_member)
-    add_child(root, child)
-    return root
-end
-
-function make_pz_tree_from_constructors(intervals, parent::AbstractCell, constructors, is_member)
-    if length(intervals) == 1
-        return constructors[begin](intervals[begin], parent, is_member)
-    else
-        cell = constructors[begin](intervals[begin], parent)
-        child = make_pz_tree_from_constructors(intervals[2:end], cell, constructors[2:end], is_member)
-        add_child(cell, child)
-        return cell
-    end
-end
-
-function make_in_pz_1(intervals, qe)
-    is_in = create_is_in_1(qe, intervals)
-
-    pos = [i for (_, i) in qe.qvs]
-    real_pos = pos .- (qe.p - length(intervals))
-    permuted_intervals = intervals[real_pos]
-
-    quantifiers = quantifier.(qe.qvs)
-
-    constructors_in = get_in_constructors_1(quantifiers)
-
-    root_in = make_pz_tree_from_constructors(constructors_in, permuted_intervals, is_in)
-    return root_in
-end
-
-function make_in_pz_2(intervals, qe)
-    is_in = create_is_in_2(qe, intervals)
-
-    pos = [i for (_, i) in qe.qvs]
-    real_pos = pos .- (qe.p - length(intervals))
-    permuted_intervals = intervals[real_pos]
-
-    quantifiers = [negation.(quantifier.(qe.qvs[1:end-1]))..., Exists]
-
-    constructors_in = get_in_constructors_2(quantifiers)
-
-    root_in = make_pz_tree_from_constructors(constructors_in, permuted_intervals, is_in)
-    return root_in
-end
-
-function make_out_pz_1(intervals, qe)
-    is_out = create_is_out_1(qe, intervals)
-
-    pos = [i for (_, i) in qe.qvs]
-    real_pos = pos .- (qe.p - length(intervals))
-    permuted_intervals = intervals[real_pos]
-
-    quantifiers = quantifier.(qe.qvs)
-
-    constructors_out = get_out_constructors_1(quantifiers)
-
-    root_out = make_pz_tree_from_constructors(constructors_out, permuted_intervals, is_out)
-    return root_out
-end
-
-function make_out_pz_2(intervals, qe)
-    is_out = create_is_out_2(qe, intervals)
-
-    pos = [i for (_, i) in qe.qvs]
-    real_pos = pos .- (qe.p - length(intervals))
-    permuted_intervals = intervals[real_pos]
-
-    quantifiers = [negation.(quantifier.(qe.qvs[1:end-1]))..., Exists]
-
-    constructors_out = get_out_constructors_2(quantifiers)
-
-    root_out = make_pz_tree_from_constructors(constructors_out, permuted_intervals, is_out)
-    return root_out
-end
-
-function make_pz(intervals, qe, make_pz_ab, make_in_pz_a, make_out_pz_b)
-    if isa(qe.problem, AndProblem)
-        sub_qes = [QuantifierProblem(problem, qe.qvs, qe.p, qe.n) for problem in problems(qe.problem)]
-        pzs = [make_pz_ab(intervals, sub_qe) for sub_qe in sub_qes]
-        pzs_in = first.(pzs)
-        pzs_out = last.(pzs)
-        pz_in = ConjunctionCell(pzs_in)
-        pz_out = DisjunctionCell(pzs_out)
-        return (pz_in, pz_out)
-    elseif isa(qe.problem, OrProblem)
-        sub_qes = [QuantifierProblem(problem, qe.qvs, qe.p, qe.n) for problem in problems(qe.problem)]
-        pzs = [make_pz_ab(intervals, sub_qe) for sub_qe in sub_qes]
-        pzs_in = first.(pzs)
-        pzs_out = last.(pzs)
-        pz_in = DisjunctionCell(pzs_in)
-        pz_out = ConjunctionCell(pzs_out)
-        return (pz_in, pz_out)
-    else
-        pz_in = make_in_pz_a(intervals, qe)
-        pz_out = make_out_pz_b(intervals, qe)
-        return (pz_in, pz_out)
-    end
-end
-
-function make_pz_11(intervals, qe)
-    return make_pz(intervals, qe, make_pz_11, make_in_pz_1, make_out_pz_1)
-end
-
-function make_pz_12(intervals, qe)
-    return make_pz(intervals, qe, make_pz_12, make_in_pz_1, make_out_pz_2)
-end
-
-function make_pz_21(intervals, qe)
-    return make_pz(intervals, qe, make_pz_21, make_in_pz_2, make_out_pz_1)
-end
-
-function make_pz_22(intervals, qe)
-    return make_pz(intervals, qe, make_pz_22, make_in_pz_2, make_out_pz_2)
-end
-
-# function make_in_paving(intervals, qe)
-#     is_in = create_is_in(qe, intervals)
-
-#     pos = [i for (_, i) in qe.qvs]
-#     real_pos = pos .- 1
-#     permuted_intervals = intervals[real_pos]
-
-#     quantifiers = quantifier.(qe.qvs)
-#     return make_paving(permuted_intervals, quantifiers, is_in)
-# end
-
-# function make_out_paving(intervals, qe)
-#     is_out = create_is_out(qe, intervals)
-
-#     pos = [i for (_, i) in qe.qvs]
-#     real_pos = pos .- 1
-#     permuted_intervals = intervals[real_pos]
-
-#     quantifiers = [negation.(quantifier.(qe.qvs[1:end-1]))..., Exists]
-#     return make_paving(permuted_intervals, quantifiers, is_out)
-# end
-
-# function make_out_paving(intervals, qe)
-#     is_out = create_is_out(qe, intervals)
-
-#     pos = [i for (_, i) in qe.qvs]
-#     real_pos = pos .- 1
-#     permuted_intervals = intervals[real_pos]
-
-#     quantifiers = quantifier.(qe.qvs)
-#     return make_paving(permuted_intervals, quantifiers, is_out)
-# end
-
-function pave(is_in::Function, is_out::Function, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    inn = []
-    out = []
-    delta = []
-    list = [X_0]
-    while !isempty(list)
-        X = pop!(list)
-        if is_in(X)
-            push!(inn, X)
-        elseif is_out(X)
-            push!(out, X)
-        elseif IntervalArithmetic.diam(X) < ϵ
-            push!(delta, X)
-        else
-            X_1, X_2 = bisect(X, 0.5)
-            push!(list, X_1)
-            push!(list, X_2)
-        end
-    end
-    return (inn, out, delta)
-end
-
-"""
-    pave(p_0, qe, X_0, ϵ, [ratio, precision_factor])
-# Arguments
-- `p_0` initial p
-- `qe` quantifier elimination problem
-- `X_0` initial interval
-- `ϵ` precision threshold for X: if diam(X) < ϵ then X is not split
-- `ratio` ratio to determine when to split the cell: if diam(X) / diam(p) <= ratio then split p
-- `precision_factor` factor to get the precision threshold for p: if diam(p) < precision_factor * ϵ then p is not split
-"""
-function pave(p_in_0::CellStart, p_out_0::CellStart, qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, ϵ::Float64, bisect_in!, bisect_out!, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    inn = []
-    out = []
-    delta = []
-    list = [(p_in_0, p_out_0, X_0)]
-    n_in = 0
-    n_out = 0
-    n_delta = 0
-    while !isempty(list)
-        p_in, p_out, X = pop!(list)
-        # println(size(p_in))
-        if @timeit to "IN" is_member(p_in, X)
-            n_in += size(p_in) > size(p_in_0) ? 1 : 0
-            push!(inn, X)
-        elseif @timeit to "OUT" is_member(p_out, X)
-            n_out += size(p_out) > size(p_out_0) ? 1 : 0
-            push!(out, X)
-        elseif IntervalArithmetic.diam(X) < ϵ
-            n_delta += 1
-            push!(delta, X)
-        else
-            @timeit to "max" max_diam = maximum(diam, [p_in, p_out])
-            # println(max_diam)
-            # if (!is_refined) || (IntervalArithmetic.diam(X) > ratio * max_diam || max_diam < precision_factor * ϵ)
-            if is_refined && max_diam > IntervalArithmetic.diam(X)
-                @timeit to "bisect in" bisect_in!(p_in, qe)
-                @timeit to "bisect out" bisect_out!(p_out, qe)
-                push!(list, (p_in, p_out, X))
+            R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_minus...])
+            if any(isempty, R_inner_minus)
+                test_minus = false
             else
-                @timeit to "bisect" X_1, X_2 = bisect(X)
-                @timeit to "deepcopy" p_in_1 = deepcopy(p_in_0)
-                @timeit to "deepcopy" p_out_1 = deepcopy(p_out_0)
-                @timeit to "deepcopy" p_in_2 = deepcopy(p_in_0)
-                @timeit to "deepcopy" p_out_2 = deepcopy(p_out_0)
-                push!(list, (p_in_1, p_out_1, X_1))
-                push!(list, (p_in_2, p_out_2, X_2))
+                test_minus = all([interval(0, 0) ⊆ interval(min(R_inner_minus[i]), max(R_inner_minus[i])) for i in 1:qcp.n])
+            end
+        end
+        G_plus = [interval(intervals[end-i].hi + ϵ, ∞) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
+        if any(isempty, G_plus)
+            test_plus = false
+        else
+            R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_plus...])
+            if any(isempty, R_inner_plus)
+                test_plus = false
+            else
+                test_plus = all([interval(0, 0) ⊆ interval(min(R_inner_plus[i]), max(R_inner_plus[i])) for i in 1:qcp.n])
+            end
+        end
+        return test_minus || test_plus
+    end
+end
+
+function bounds(f, X, interval)
+    return [f[i]([X.v..., interval...]) for i in 1:length(f)]
+end
+
+function check_is_in(X_0, p_in, G, qcp, criterion)
+    @assert criterion == 1 || criterion == 2
+
+    indices_forall = [i for (q, i) in qcp.qvs if q == Forall] .- length(X_0)
+    indices_exists = [i for (q, i) in qcp.qvs if q == Exists] .- length(X_0)
+
+    indices = [1 for i in 1:length(p_in)]
+    lengths = length.(p_in)
+    is_in_union = false
+    while !is_in_union && (isempty(indices_exists) || indices[indices_exists] <= lengths[indices_exists])
+        is_in_intersection = true
+        while is_in_intersection && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
+            sub_interval = [[p_in[i][indices[i]] for i in 1:length(p_in)]..., G...]
+            if criterion == 1
+                is_in = create_is_in_1(qcp, sub_interval)
+            end
+            if criterion == 2
+                f_bounds = bounds(qcp.problem.f, X_0, sub_interval)
+                is_in = create_is_in_2(qcp, sub_interval, f_bounds)
+            end
+            is_in_intersection &= is_in(X_0)
+            if isempty(indices_forall)
+                break
+            end
+            increment!(indices, lengths, indices_forall)
+        end
+        for i in indices_forall
+            indices[i] = 1
+        end
+        is_in_union |= is_in_intersection
+        if isempty(indices_exists)
+            break
+        end
+        increment!(indices, lengths, indices_exists)
+    end
+    return is_in_union
+end
+
+check_is_in_1(X_0, p_in, G, qcp) = check_is_in(X_0, p_in, G, qcp, 1)
+check_is_in_2(X_0, p_in, G, qcp) = check_is_in(X_0, p_in, G, qcp, 2)
+
+function check_is_out(X_0, p_out, G, qcp, criterion)
+    @assert criterion == 1 || criterion == 2
+
+    indices_forall = [i for (q, i) in qcp.qvs if q == Forall] .- length(X_0)
+    indices_exists = [i for (q, i) in qcp.qvs if q == Exists] .- length(X_0)
+
+    indices = [1 for i in 1:length(p_in)]
+    lengths = length.(p_out)
+    is_out_intersection = true
+    while is_out_intersection && (isempty(indices_exists) || indices[indices_exists] <= lengths[indices_exists])
+        is_out_union = false
+        while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
+            sub_interval = [[p_out[i][indices[i]] for i in 1:length(p_out)]..., G...]
+            if criterion == 1
+                is_out = create_is_out_1(qcp, sub_interval)
+            end
+            if criterion == 2
+                f_bounds = bounds(qcp.problem.f, X_0, sub_interval)
+                is_out = create_is_out_2(qcp, sub_interval, f_bounds, 0.00001)
+            end
+            is_out_union |= is_out(X_0)
+            increment!(indices, lengths, indices_forall)
+            if isempty(indices_forall)
+                break
+            end
+        end
+        for i in indices_forall
+            indices[i] = 1
+        end
+        is_out_intersection &= is_out_union
+        increment!(indices, lengths, indices_exists)
+        if isempty(indices_exists)
+            break
+        end
+    end
+    return is_out_intersection
+end
+
+check_is_out_1(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 1)
+check_is_out_2(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 2)
+
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in, check_is_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+    inn = []
+    @assert nand(is_refined, allow_normal_p_bisect) "Cannot have P refined and normal bisection on P."
+    p_in_0 = deepcopy(p_in)
+    p_out_0 = deepcopy(p_out)
+    inn = []
+    out = []
+    delta = []
+    list = [(X, p_in, p_out)]
+    while !isempty(list)
+        X, p_in, p_out = pop!(list)
+        if !is_refined && !allow_normal_p_bisect
+            if check_is_in(X, p_in, G, qcp)
+                push!(inn, X)
+            elseif check_is_out(X, p_out, G, qcp)
+                push!(out, X)
+            elseif IntervalArithmetic.diam(X) < ϵ_x
+                push!(delta, X)
+            else
+                X_1, X_2 = bisect(X)
+                push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
+                push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
+            end
+        end
+        if is_refined
+            p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in)); init=0.0)
+            p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out)); init=0.0)
+            p_max = maximum((p_in_max, p_out_max))
+            X_max = IntervalArithmetic.diam(X)
+            if check_is_in(X, p_in, G, qcp)
+                push!(inn, X)
+            elseif check_is_out(X, p_out, G, qcp)
+                push!(out, X)
+            elseif X_max < ϵ_x && p_max < ϵ_p
+                push!(delta, X)
+            elseif X_max >= ϵ_x && p_max < ϵ_p
+                X_1, X_2 = bisect(X)
+                push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
+                push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
+            elseif X_max < ϵ_x && p_max >= ϵ_p
+                if ϵ_p <= p_in_max
+                    bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
+                end
+                if ϵ_p <= p_out_max
+                    bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
+                end
+                push!(list, (X, p_in, p_out))
+            else
+                if X_max < p_max
+                    if ϵ_p <= p_in_max
+                        bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
+                    end
+                    if ϵ_p <= p_out_max
+                        bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
+                    end
+                    push!(list, (X, p_in, p_out))
+                else
+                    X_1, X_2 = bisect(X)
+                    push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
+                    push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
+                end
+            end
+        end
+        if allow_normal_p_bisect
+            indices_forall = [i for (q, i) in qcp.qvs if q == Forall] .- length(X)
+            indices_exists = [i for (q, i) in qcp.qvs if q == Exists] .- length(X)
+            p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in[indices_exists])); init=0.0)
+            p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out[indices_forall])); init=0.0)
+            p_max = maximum((p_in_max, p_out_max))
+            X_max = IntervalArithmetic.diam(X)
+            if check_is_in(X, p_in, G, qcp)
+                push!(inn, X)
+            elseif check_is_out(X, p_out, G, qcp)
+                push!(out, X)
+            elseif X_max < ϵ_x && p_max < ϵ_p
+                push!(delta, X)
+            elseif X_max >= ϵ_x && p_max < ϵ_p
+                X_1, X_2 = bisect(X)
+                push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
+                push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
+            elseif X_max < ϵ_x && p_max >= ϵ_p
+                if ϵ_p <= p_in_max
+                    bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
+                end
+                if ϵ_p <= p_out_max
+                    bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
+                end
+                push!(list, (X, p_in, p_out))
+            else
+                if X_max < p_max
+                    if ϵ_p <= p_in_max
+                        bisect_largest_exists!(p_in, qcp.qvs, qcp.p, qcp.n)
+                    end
+                    if ϵ_p <= p_out_max
+                        bisect_largest_forall!(p_out, qcp.qvs, qcp.p, qcp.n)
+                    end
+                    push!(list, (X, p_in, p_out))
+                else
+                    X_1, X_2 = bisect(X)
+                    push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
+                    push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
+                end
             end
         end
     end
-    println("n_in: $n_in\nn_out: $n_out\nn_delta: $n_delta")
-    return (inn, out, delta)
+    return inn, out, delta
 end
 
-function pave_11(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    @timeit to "pz init" p_in_0, p_out_0 = make_pz_11(intervals, qe)
-    # print_tree(p_in_0)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_1!, ratio, precision_factor, is_refined=is_refined)
+pave_11(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_1)
+pave_12(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_2)
+pave_21(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_1)
+pave_22(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_2)
+
+# Utils
+
+function volume_box(box)
+    return prod(IntervalArithmetic.diam.(box))
 end
 
-function pave_12(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    p_in_0, p_out_0 = make_pz_12(intervals, qe)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_1!, bisect_out_2!, ratio, precision_factor, is_refined=is_refined)
-end
-
-function pave_21(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    p_in_0, p_out_0 = make_pz_21(intervals, qe)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_1!, ratio, precision_factor, is_refined=is_refined)
-end
-
-function pave_22(qe::QuantifierProblem, X_0::IntervalArithmetic.IntervalBox{N, T}, intervals, ϵ::Float64, ratio::Float64=0.2, precision_factor::Int=10; is_refined::Bool=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    p_in_0, p_out_0 = make_pz_22(intervals, qe)
-    return pave(p_in_0, p_out_0, qe, X_0, ϵ, bisect_in_2!, bisect_out_2!, ratio, precision_factor, is_refined=is_refined)
-end
-
-function bisect!(root::CellStart, qe, create_is_member)
-    candidate = largest_bisectable_cell(root)
-
-    idx = depth(candidate)
-    interval_1, interval_2 = bisect(candidate.interval)
-
-    initial_intervals = starting_intervals(root)
-    intervals_1 = [i == idx ? interval_1 : initial_intervals[i] for i in 1:length(qe.qvs)]
-    intervals_2 = [i == idx ? interval_2 : initial_intervals[i] for i in 1:length(qe.qvs)]
-
-    pos = index.(qe.qvs)
-    pseudo_pos = pos .- (qe.p - length(intervals))
-    reordered_intervals_1 = deepcopy(initial_intervals)[pseudo_pos]
-    reordered_intervals_2 = deepcopy(initial_intervals)[pseudo_pos]
-    is_member_1 = create_is_member(qe, IntervalBox(reordered_intervals_1))
-    is_member_2 = create_is_member(qe, IntervalBox(reordered_intervals_2))
-
-    push!(candidate.parent, intervals_1, idx, get_constructors(root), is_member_1)
-    push!(candidate.parent, intervals_2, idx, get_constructors(root), is_member_2)
-    remove!(candidate)
-end
-
-function bisect!(root::ConnectiveCell, qe, create_is_member)
-    for (child, sub_problem) in zip(children(root), problems(qe.problem))
-        sub_qe = QuantifierProblem(sub_problem, qe.qvs, qe.p, qe.n)
-        bisect!(child, sub_qe, create_is_member)
+function volume_boxes(boxes)
+    if isempty(boxes)
+        return 0
     end
+    return sum(volume_box.(boxes))
 end
 
-function bisect_in_1!(cell::CellStart, qe::QuantifierProblem)
-    return bisect!(cell, qe, create_is_in_1)
-end
-
-function bisect_in_2!(cell::CellStart, qe::QuantifierProblem)
-    return bisect!(cell, qe, create_is_in_2)
-end
-
-function bisect_out_1!(cell::CellStart, qe::QuantifierProblem)
-    return bisect!(cell, qe, create_is_out_1)
-end
-
-function bisect_out_2!(cell::CellStart, qe::QuantifierProblem)
-    return bisect!(cell, qe, create_is_out_2)
-end
-
-function pave(qe::QuantifierProblem, intervals::Vector{IntervalArithmetic.Interval{T}}, X_0::IntervalArithmetic.Interval{T}, ϵ::Float64) where {T<:Number}
-    is_in = create_is_in(qe, intervals)
-    is_out = create_is_out(qe, intervals)
-    return pave(is_in, is_out, X_0, ϵ)
-end
-
-function merge_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}) where {T<:Number}
+function merge_intervals(intervals)
     disconnected = deepcopy(intervals)
     merged = []
     while !isempty(disconnected)
@@ -487,39 +429,23 @@ function merge_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}) wher
     return merged
 end
 
-function print_inn_out_delta(inn::Vector{IntervalArithmetic.IntervalBox{N, T}}, out::Vector{IntervalArithmetic.IntervalBox{N, T}}, delta::Vector{IntervalArithmetic.IntervalBox{N, T}}) where {N, T<:Number}
-    if N == 1
-        Base.println("Union of elements of inn: ", merge_intervals([box[1] for box in inn]))
-        Base.println("Union of elements of out: ", merge_intervals([box[1] for box in out]))
-        Base.println("Union of elements of delta: ", merge_intervals([box[1] for box in delta]))
-    else
-        Base.println("Number of elements of inn: ", length(inn))
-        Base.println("Number of elements of out: ", length(out))
-        Base.println("Number of elements of delta: ", length(delta))
-    end
-end
-
 rectangle(p, q) = Shape([p[1],q[1],q[1],p[1]], [p[2],p[2],q[2],q[2]])
 
-function draw_lines(intervals, color, y)
+function draw_lines(pl, intervals, color)
     for interval in intervals
-        p = [interval.lo, y-0.1]
-        q = [interval.hi, y+0.1]
-        plot!(rectangle(p,q), color=color, linecolor=nothing, legend=:false)
+        p = [interval.lo, -0.1]
+        q = [interval.hi, 0.1]
+        plot!(pl, rectangle(p,q), color=color, linecolor=nothing, legend=:false)
     end
 end
 
-function draw_rows(blocks, color)
-    n = length(blocks)
-    for i in 1:n
-        y = n - i
-        draw_lines(merge_intervals([box[1] for box in blocks[i]]), color, y)
-    end
+function draw_rows(p, boxes, color)
+    draw_lines(p, merge_intervals([box[1] for box in boxes]), color)
 end
 
-draw_inn_lines(inns) = draw_rows(inns, :green)
-draw_out_lines(outs) = draw_rows(outs, :cyan)
-draw_delta_lines(deltas) = draw_rows(deltas, :yellow)
+draw_inn_lines(p, inns) = draw_rows(p, inns, :green)
+draw_out_lines(p, outs) = draw_rows(p, outs, :cyan)
+draw_delta_lines(p, deltas) = draw_rows(p, deltas, :yellow)
 
 function draw_rectangles(boxes, color)
     for box in boxes
@@ -535,17 +461,14 @@ draw_delta_rectangles(delta) = draw_rectangles(delta, :yellow)
 draw_inn_rectangles(inn) = draw_rectangles(inn, :green)
 draw_out_rectangles(out) = draw_rectangles(out, :cyan)
 
-function draw(X_0, inn, out, delta)
+function draw(p, X_0, inn, out, delta)
     if isa(X_0, IntervalBox{1, <:Number})
-        xlabel!("x")
         xticks!((X_0[1].lo:1:X_0[1].hi))
-        ylabel!("criteria: O_IN, O_OUT")
-        ylims!((-0.1,3.1))
-        yticks!([3:-1:0;], ["1,1", "1,2", "2,1", "2,2"])
+        yaxis!(false)
 
-        draw_delta_lines(delta)
-        draw_inn_lines(inn)
-        draw_out_lines(out)
+        draw_delta_lines(p, delta)
+        draw_inn_lines(p, inn)
+        draw_out_lines(p, out)
     elseif isa(X_0, IntervalBox{2, <:Number})
         xs = X_0[1]
         ys = X_0[2]
@@ -560,10 +483,12 @@ function draw(X_0, inn, out, delta)
     end
 end
 
-function volume(box::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
-    return prod(IntervalArithmetic.diam.(box))
+function print_inn_out_delta(inn, out, delta)
+    Base.println("Union of elements of inn: ", merge_intervals([box[1] for box in inn]))
+    Base.println("Union of elements of out: ", merge_intervals([box[1] for box in out]))
+    Base.println("Union of elements of delta: ", merge_intervals([box[1] for box in delta]))
 end
 
-function volume(boxes::Vector{IntervalArithmetic.IntervalBox{N, T}}) where {N, T<:Number}
-    return sum(volume.(boxes))
+function print_delta_width(delta)
+    Base.println("Width of delta regions: ", IntervalArithmetic.diam.(merge_intervals([box[1] for box in delta])))
 end

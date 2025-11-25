@@ -285,7 +285,7 @@ function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
      range_Dg = Base.invokelatest(Dg_fun[j],input)
 
      outer = interval(c,c)
-
+      # println(outer)
     for i = 2p-1:-2:1
       if quantifiers[i] == "exists"
         outer = outer+O(range_Dg,radii,quantifiers[i+1])
@@ -295,6 +295,7 @@ function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
           break
         end
       end
+      # println(outer)
     end
   
     if (outer==EmptySet(1))

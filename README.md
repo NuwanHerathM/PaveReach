@@ -1,191 +1,231 @@
 # PaveReach
 
+Paving of a set describing a quantified constraint problem, using general reachability.
+
+We refer here to sections, figures and tables of the article that uses this artifact.
+
+## Gist of the program
+
+```julia
+inn, out, delta = paving11(...)
+```
+
+For a quantified set $\Sigma$, the paving function `paving11` returns
+- the inside $\Sigma^-$ in  `inn`,
+- the outside $(\Sigma^\complement)^-$ in `out`,
+- and the potential boundary $\Sigma^\Delta$ in `delta`.
+
+For the different paving functions, see [Oracles](#oracles).
+
 ## Dependencies
 
-GenReach
-IntervalArithmetic
-LazySets
-Polyhedra
-StaticArrays
-Symbolics
-CDDLib
+`PaveReach` relies on `GenReach`. In this prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
 
-PaveReach
-Match
-TimerOutputs
-Plots
-PyPlot
-<!-- PythonPlot (to be added after PyPlot) -->
-ConstructionBase
-ArgParse
+### List of the packages
+
+For `GenReach`
+* `IntervalArithmetic`
+* `LazySets`
+* `Polyhedra`
+* `StaticArrays`
+* `Symbolics`
+* `CDDLib`
+
+For `PaveReach`
+* `Match`
+* `Plots`
+* `ArgParse`
+* `LaTeXStrings`
+* `BenchmarkTools`
+
+### Adding a package
+
+Call `julia` to get in the interactive REPL.
+You will get to the `julia>` prompt.
+```julia
+julia>
+```
+Type `]` to get to the Pkg REPL-mode (the built-in Julia package manager).
+```julia
+pkg>
+```
+Add one package.
+```julia
+pkg> add <name_of_the_package>
+```
+Or add all the packages at once.
+```julia
+pkg> add IntervalArithmetic LazySets Polyhedra StaticArrays Symbolics CDDLib Match Plots ArgParse LaTeXStrings BenchmarkTools
+```
+To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
+
+## Recreating artifact outputs (figures and tables)
+
+The scripts `Fig<n>.sh` where `<n>` is in {3, 4, ..., 11} produce  `.png` files in order to construct the corresponding figures.
+
+The scripts `Tab<n>.sh` where `<n>` is in {5, 6, 7, 8} produce `.log` reports in order to construct the corresponding tables.
 
 ## Quick start
 
-Try the running example from the article (Example 3.1):
-```julia
-# Non-interactive run (prints inn/out/delta)
-julia 3-2_runningexample.jl
+### Try a 2D toy example
 
-# Run and keep REPL open for interactive plotting / display
-julia -i 3-2_runningexample.jl -d
+Run (no command line argument, everything is hardcoded):
 ```
-Try a 2D toy example:
-```julia
-# Non-interactive run (prints size of inn/out/delta)
-julia 0-1_disk.jl
+julia ex_0-1_disk.jl
+```
+It should return:
+```
+ϵ_x  = 0.1
+ϵ_p  = 0.5
+Not refined
+Normal bisection on P
+Undecided domain: 2.6 %
+The result was saved in ex_0-1_disk_11_0.1_0.5_subdivided.png.
+```
+You will find the output in a file name `ex_0-1_disk_11_0.1_0.5_subdivided.png`.
 
-# Run and keep REPL open for interactive plotting / display
-julia -i 0-1_disk.jl -d
+### Try the running example from the article (Section 5.1)
+
+Run
 ```
+julia ex_5-1_running_example.jl 1 1 0.1 --save
+```
+It should return (with the execution time instead of `<time>`):
+```
+O^IN_1, O^OUT_1
+ϵ_x  = 0.1
+ϵ_p = nothing
+Not refined
+No standard bisection on P
+  <time> ms (19787 allocations: 712.52 KiB)
+Undecided domain: 18.8 %
+The result was saved in ex_5-1_running_example_11_0.1.png.
+```
+You will find the output in a file named `ex_5-1_running_example_11_0.1.png`.
 
 ## What the examples do
 
-### Detailed explanation for a 1D example (`3-2_runningexample.jl`)
+### Explanation for a 2D example (`ex_0-1_disk.jl`)
 
-The example in `3-2_runningexample.jl` sets up the scalar problem:
-$$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], \exists z \in [-1/4, 1/4], f(x, p_1, z) = p_1^2 - (x - 1)(x - 2)(x - 3) - z = 0 \}$$
-
-- Quantifiers: $∀ p1 ∈ [0, 1/4], ∃ z ∈ [-1/4, 1/4]$
-- Domain for x: $X_0 = [-5, 5]$
-- Paving precision: $\epsilon = 0.1$
-
-The script:
-1. Constructs a `QuantifierProblem`. Beware that the free variable $x$ is affected to the variable `x[1]`. The order does not matter for $p_1$ and $z$ however.
-```julia
-# 1
-n = 1
-# Dimension of the domain of f
-p = 3
-# x[1] := x, x[2] := p_1, x[3] := z
-@variables x[1:p]
-# f(x, p_1, z) = p_1^2 - (x - 1)(x - 2)(x - 3) - z
-f_num = [x[2]^2-(x[1]-1)*(x[1]-2)*(x[1]-3)-x[3]]
-f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-# problem := f, Df
-problem = Problem(f_fun, Df_fun)
-# problem, [∀ p1, ∃ z], p, n
-qe = QuantifierProblem(f_fun, Df_fun, [(Forall, 2), (Exists, 3)], p, n)
-```
-2. Builds initial inner/outer refinement trees and runs `pave_11`.
-```julia
-# Domain to be paved X_0
-X_0 = IntervalBox(interval(-5, 5))
-# p_1 ∈ [0, 1/4], z ∈ Z
-intervals = [interval(0, 1/4), interval(-1/4, 1/4)]                                               
-# Precision
-eps = 0.1
-# Paving using the 1st criterion for IN and the 1st criterion for OUT
-pz_in_0, pz_out_0 = make_pz_11(intervals, qe)
-inn, out, delta = pave_11(pz_in_0, pz_out_0, qe, X_0, eps)
-```
-3. Prints the results: `inn`, `out`, and `delta` (inner approximation, outer approximation, and undecided / boundary set).
-```julia
-print_inn_out_delta(inn, out, delta)
-```
-4. Optionally displays a visualization when the `--display` (`-d`) flag is given.
-After running, the script prints three objects:
-- `inn` — green
-- `out` — blue
-- `delta` — yellow
-
-### Brief explanation for a 2D example (`0-1_disk.jl`)
+> Note: the example is degenerated, there is no parameter $\mathbb{P}$.
 
 The example in `0-1_disk.jl` sets up the scalar problem:
-$$\{ x \in [-5, 5] \times [-5, 5] \, | \, \exists z \in [0, 16], f(x, z) = x_1^2 + x_2^2 - z = 0 \}$$
+$$\{ x \in [-5, 5] \times [-5, 5] \, | \, \exists z \in [0, 16], f(x, z) = x_1^2 + x_2^2 - z = 0 \}.$$
 
-- Quantifier: $∃ z ∈ [0, 16]$
-- Domain for x: $X_0 = [-5, 5] \times [-5, 5]$
-- Paving precision: $\epsilon = 0.1$
+- Domain for x: $\mathbb{X}_0 = [-5, 5] \times [-5, 5]$
+- Parameters and quantifiers: none
+- Target: $\mathbb{G} = [0, 16]$
+- Paving precision: $\epsilon_{\mathbb{X}} = 0.1$
+- Parameter subdivision precision: $\epsilon_{\mathbb{P}} = 0.5$
 
-The script:
-1. Constructs a `QuantifierProblem`. Beware that the free variable $x$ is affected to the variables `x[1]` and `x[2]`. By default, $z$ is then affected to `x[3]`.
-```julia
-# 1
-n = 1
-# Dimension of the domain of f
-p = 3
-# x[1] := x_1, x[2] := x_2, x[3] := z
-@variables x[1:p]
-# f(x, p_1, z) = x_1^2 + x_2^2 - z
-f_num = [x[1]^2 + x[2]^2 - x[3]]
-f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-# problem := f, Df
-problem = Problem(f_fun, Df_fun)
-# f, Df, [∃ z], p, n
-qe = QuantifierProblem(problem, [(Exists, 3)], p, n)
+Check the detailed explanation of the script [here](README_ex_0-1_disk.md).
+
+### Explanation for a 1D example (`ex_5-1_running_example.jl`)
+
+The example in `ex_5-1_running_example.jl` sets up the scalar problem:
+$$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], f(x, p_1) = p_1^2 - (x - 1)(x - 2)(x - 3) \in [-1/4, 1/4] \}$$
+
+- Domain for $x$: $X_0 = [-5, 5]$
+- Parameters and quantifiers: $∀ p1 ∈ [0, 1/4]$
+- Target: $\mathbb{G} = [-1/4, 1/4]$
+
+Check the detailed explanation of the script [here](README_ex_5-1_running_example.md).
+
+In order to pave with 
+- $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$,
+- $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $\mathbb{G}$
+- and $\epsilon_\mathbb{X} = 0.1$,
+
+run
 ```
-2. Builds initial inner/outer refinement trees and runs `pave_11`.
-```julia
-# Domain to be paved X_0
-X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
-# z ∈ Z = [0, 16]
-intervals = [interval(0, 16)]
-# Precision
-eps = 0.1
-# Paving using the 1st criterion for IN and the 1st criterion for OUT
-pz_in_0, pz_out_0 = make_pz_11(intervals, qe)
-inn, out, delta = pave_11(pz_in_0, pz_out_0, qe, X_0, eps)
+julia ex_5-1_running_example.jl 1 1 0.1
 ```
-3. Same as the previous example...
-4. ...
+The first two arguments, `1` and `1`, select the paving function `pave11`. See [Oracles](#oracles). The third argument, `0.1` corresponds to $\epsilon_\mathbb{X}$.
+
+In order to pave with subdivision as in Section 4.1
+- $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$,
+- $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$
+- $\epsilon_\mathbb{X} = 0.1$
+- and $\epsilon_\mathbb{P} = 0.1$,
+
+run
+```
+julia ex_5-1_running_example.jl 1 1 0.1 0.1 --subdivide
+```
+
+The output can be saved with the option `--save`.
+To get more information, use
+```
+julia ex_5-1_running_example.jl --help
+```
+```
+usage: ex_5-1_running_example.jl [-r] [-s] [--save] [-h] o_in o_out
+                        eps_x [eps_p]
+
+positional arguments:
+  o_in             oracle for IN (type: Int64)
+  o_out            oracle for OUT (type: Int64)
+  eps_x            epsilon for the paving (type: Float64)
+  eps_p            epsilon for the parameters (type: Float64)
+
+optional arguments:
+  -r, --refine     bisect the parameters with ∀ and replace the ones
+                   with ∃ by points (or vice versa), requires eps_p,
+                   does not work with --subdivide
+  -s, --subdivide  bisect the parameters with either ∀ or ∃, requires
+                   eps_p, does not work with --refine
+  --save           save the output
+  -h, --help       show this help message and exit
+```
 
 ## Oracles
 
-To choose the 1st criterion for IN and the 1st criterion for OUT, select `make_pz_11` and `pave_11`
-```julia
-pz_in_0, pz_out_0 = make_pz_11(intervals, qe)
-inn, out, delta = pave_11(pz_in_0, pz_out_0, qe, X_0, eps)
-```
-To choose the 1st criterion for IN and the 2st criterion for OUT, select `make_pz_12` and `pave_12`
-```julia
-pz_in_0, pz_out_0 = make_pz_12(intervals, qe)
-inn, out, delta = pave_12(pz_in_0, pz_out_0, qe, X_0, eps)
-```
-And so on...
+Select one of the four paving function according to this table
 
-## Parameter refinement (P, Z)
+|   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $\mathbb{G}$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$
+|---|---|---
+| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$                  | `pave11` | `pave12`
+| $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$ | `pave21` | `pave22`
 
-No refinement:
+> Note: the user does not have to construct $\neg\mathbb{P}$ or $\mathbb{G}^\complement$. The four paving functions take $\mathbb{P}$ and $\mathbb{G}$ as input, so swapping between the functions amounts to changing the name of the function.
+
+## Parameter subdivision
+
+No parameter subdivision:
 ```julia
-inn, out, delta = pave_11(pz_in_0, pz_out_0, qe, X_0, eps, is_refined=false)
+inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, nothing, false, false)
 ```
-Refinement:
+Subdivision as in Section 4.1:
 ```julia
-inn, out, delta = pave_11(pz_in_0, pz_out_0, qe, X_0, eps)
+inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, false, true)
 ```
-or
+Points/subdivision as in Section 4.2:
 ```julia
-inn, out, delta = pave_11(pz_in_0, pz_out_0, qe, X_0, eps, is_refined=true)
+inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, true, false)
 ```
 
-## Conjunction and disjunction
+## Saving the output
 
-For a conjunction
-$$\{ \dots \, | \, \dots, f_1(x, p, z) = 0  \, \wedge \, f_2(x, p, z) = 0 \, \wedge \, f_3(x, p, z) = 0 \}$$
 ```julia
-f_fun_1, Df_fun_1 = ...
-problem_1 = Problem(f_fun_1, Df_fun_1)
-f_fun_2, Df_fun_2 = ...
-problem_2 = Problem(f_fun_2, Df_fun_2)
-f_fun_3, Df_fun_3 = ...
-problem_3 = Problem(f_fun_3, Df_fun_3)
-# Conjunction
-problem = AndProblem([problem_1, problem_2, problem_3])
+p = plot()
+draw(p, X_0, inn, out, delta)
+plot(p)
+outfile = ...
+savefig(outfile)
+println("The result was saved in $(outfile).")
 ```
 
-For a combination of disjunction and conjunction
-$$\{ \dots \, | \, \dots, (f_1(x, p, z) = 0  \, \vee \, f_2(x, p, z) = 0) \, \wedge \, f_3(x, p, z) = 0 \}$$
+## Displaying the output
+
 ```julia
-f_fun_1, Df_fun_1 = ...
-problem_1 = Problem(f_fun_1, Df_fun_1)
-f_fun_2, Df_fun_2 = ...
-problem_2 = Problem(f_fun_2, Df_fun_2)
-f_fun_3, Df_fun_3 = ...
-problem_3 = Problem(f_fun_3, Df_fun_3)
-# Disjunction -- subproblem
-sub_problem = OrProblem([problem_1, problem_2])
-# Conjunction -- problem
-problem = AndProblem([sub_problem, problem_3])
+p = plot()
+draw(p, X_0, inn, out, delta)
+plot(p)
+gui()
 ```
 
-See `0-3_disk_intersection.jl` for an example of a conjuction.
+Run the script in interactive mode in order to keep the REPL open for the plot.
+
+```
+julia -i ...
+```
