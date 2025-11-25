@@ -7,6 +7,8 @@ We refer here to sections, figures and tables of the article that uses this arti
 ## Gist of the program
 
 ```julia
+include("pave.jl")
+...
 inn, out, delta = paving11(...)
 ```
 
@@ -177,6 +179,24 @@ optional arguments:
   --save           save the output
   -h, --help       show this help message and exit
 ```
+
+## Quantified constraint problem
+
+The `QuantifiedConstraintProblem` type aggregates the information needed to compute the reachability from `GenReach`.
+```julia
+n = 2
+...
+# problem := f, Df
+problem = Problem(f_fun, Df_fun)
+# Quantified variables
+qvs = ...
+# Relaxed quantified variables
+qvs_relaxed_1 = ...
+qvs_relaxed_2 = ...
+# Quantifier elimination problem
+qcp = QuantifiedConstraintProblem(problem, qvs, [qvs_relaxed_1, qvs_relaxed_2], p, n)
+```
+See the examples for further details.
 
 ## Oracles
 
