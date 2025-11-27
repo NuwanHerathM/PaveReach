@@ -2,12 +2,10 @@
 
 filename=ex_5-1_running_example
 
-for o_in in 1 2
+o_in=1
+o_out=1
+for eps in 0.1 0.01 0.001
 do
-    for o_out in 1 2
-    do
-        eps_x=0.1
-        echo "$o_in, $o_out, $eps_x"
-        julia ${filename}.jl $o_in $o_out $eps_x --save
-    done
+    echo "$o_in, $o_out, $eps"
+    julia ${filename}.jl $o_in $o_out $eps --save
 done

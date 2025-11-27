@@ -125,7 +125,7 @@ Check the detailed explanation of the script [here](README_ex_0-1_disk.md).
 ### Explanation for a 1D example (`ex_5-1_running_example.jl`)
 
 The example in `ex_5-1_running_example.jl` sets up the scalar problem:
-$$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], f(x, p_1) = p_1^2 - (x - 1)(x - 2)(x - 3) \in [-1/4, 1/4] \}$$
+$$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], f(x, p_1) = p_1^2 - (x - 1)(x - 2)(x - 3) \in [-1/4, 1/4] \}.$$
 
 - Domain for $x$: $X_0 = [-5, 5]$
 - Parameters and quantifiers: $∀ p1 ∈ [0, 1/4]$

@@ -1,12 +1,8 @@
 #!/bin/bash
 
-filename=ex_5-3_dubins
+filename=ex_5-5_robot_collision
 
 eps_x=0.01
+eps_p=0.01
 echo "$eps_x"
-echo "x"
-julia ${filename}.jl $eps_x -x --save
-echo "y"
-julia ${filename}.jl $eps_x -y --save
-echo "theta"
-julia ${filename}.jl $eps_x -t --save
+julia ${filename}.jl $eps_x $eps_p -r --save
