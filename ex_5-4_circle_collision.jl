@@ -58,21 +58,21 @@ f_fun = [x -> (2.5*sin(x[3]) - x[1])^2 + (2.5*cos(x[3]) - x[2])^2 - x[4]]
 Df_fun = [x -> [(-2*(2.5*sin(x[3]) - x[1])) (-2*(2.5*cos(x[3]) - x[2])) (5*cos(x[3])*(2.5*sin(x[3]) - x[1]) - 5*sin(x[3])*(2.5*cos(x[3]) - x[2])) -1]]
 problem = Problem(f_fun, Df_fun)
 qvs = [(Forall, 3)]
-qe = QuantifierProblem(problem, qvs, [qvs], p, n)
+qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
 X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
 p_in = [[interval(-π, π)]]
 p_out = deepcopy(p_in)
 G = [interval(0.25, 100)]
 
 if allow_exists_and_forall_bisection
-    refine_in!(p_in, qe.qvs, ϵ_p, qe.p, qe.n)
-    refine_out!(p_out, qe.qvs, ϵ_p, qe.p, qe.n)
+    refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+    refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
 end
 
 println("ϵ_x = ", ϵ_x)
 println("ϵ_p = ", ϵ_p)
 
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qe, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
+@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 if parsed_args["save"]
