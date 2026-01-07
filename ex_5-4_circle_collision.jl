@@ -45,7 +45,9 @@ if isnothing(ϵ_p)
     @assert !allow_exists_and_forall_bisection "eps_p was not provided. Refinement requires eps_p. Use --help for more information."
     @assert !allow_exists_or_forall_bisection "eps_p was not provided. Subdivision requires eps_p. Use --help for more information."
 else
-    @warn "eps_p was provided, but will not be used. Provide options --refine or --subdivide in order to use eps_p."
+    if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
+        @warn "eps_p was provided, but will not be used. Provide options --refine or --subdivide in order to use eps_p."
+    end
 end
 @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
 # ------------------------------------------------------

@@ -1,4 +1,4 @@
-using IntervalArithmetic
+# using IntervalArithmetic
 using Plots
 
 include("genreach2.jl")
@@ -275,9 +275,9 @@ end
 check_is_out_1(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 1)
 check_is_out_2(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 2)
 
-function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in, check_is_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     inn = []
-    @assert nand(is_refined, allow_normal_p_bisect) "Cannot have P refined and normal bisection on P."
+    @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
     p_in_0 = deepcopy(p_in)
     p_out_0 = deepcopy(p_out)
     inn = []
@@ -286,7 +286,7 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
     list = [(X, p_in, p_out)]
     while !isempty(list)
         X, p_in, p_out = pop!(list)
-        if !is_refined && !allow_normal_p_bisect
+        if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
             if check_is_in(X, p_in, G, qcp)
                 push!(inn, X)
             elseif check_is_out(X, p_out, G, qcp)
@@ -299,7 +299,7 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
                 push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
             end
         end
-        if is_refined
+        if allow_exists_and_forall_bisection
             p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in)); init=0.0)
             p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out)); init=0.0)
             p_max = maximum((p_in_max, p_out_max))
@@ -338,7 +338,7 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
                 end
             end
         end
-        if allow_normal_p_bisect
+        if allow_exists_or_forall_bisection
             indices_forall = [i for (q, i) in qcp.qvs if q == Forall] .- length(X)
             indices_exists = [i for (q, i) in qcp.qvs if q == Exists] .- length(X)
             p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in[indices_exists])); init=0.0)
@@ -383,10 +383,10 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
     return inn, out, delta
 end
 
-pave_11(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_1)
-pave_12(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_1, check_is_out_2)
-pave_21(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_1)
-pave_22(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect, check_is_in_2, check_is_out_2)
+pave_11(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_1, check_is_out_1)
+pave_12(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_1, check_is_out_2)
+pave_21(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_2, check_is_out_1)
+pave_22(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_2, check_is_out_2)
 
 # Utils
 

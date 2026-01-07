@@ -1,8 +1,8 @@
 using IntervalArithmetic
+using Symbolics 
 using LazySets
 using Polyhedra
 using StaticArrays
-using Symbolics 
 using CDDLib
 
 function print_QE(QE)
