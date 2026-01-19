@@ -48,6 +48,9 @@ end
 struct Problem
     f::Vector{Function}
     Df::Vector{Function}
+    ϕ::Vector{Function}
+    dnf_1_indices::Vector{Vector{Int}}
+    dnf_2_indices::Vector{Vector{Int}}
 end
 
 abstract type ConnectedProblem end
