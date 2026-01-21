@@ -58,6 +58,43 @@ function act_gradient(act::NeuralVerification.ReLU, box::IntervalBox)
     return IntervalBox(intervals)
 end
 
+function sigmoid(x)
+   return 1.0/(1.0+exp(-x))
+end
+
+function sigmoid(box::IntervalBox)
+   l = []
+   for x in box
+      push!(l, sigmoid(x))
+   end
+   return IntervalBox(l)
+end
+
+function sigmoidder(x::Float64)
+   return sigmoid(x)*(1.0-sigmoid(x))
+end
+
+# Needs correct rounding
+function sigmoidder(x::IntervalArithmetic.Interval{Float64})
+    if x.hi < 0
+        return interval(sigmoidder(x.lo), sigmoidder(x.hi))
+    elseif x.lo > 0
+        return interval(sigmoidder(x.hi), sigmoidder(x.lo))
+    else
+        low = min(sigmoidder(x.lo), sigmoidder(x.hi))
+        high = 0.25
+        return interval(low, high)
+    end
+end
+
+function act_gradient(act::NeuralVerification.Sigmoid, box::IntervalBox)
+   l = []
+   for x in box
+      push!(l, sigmoidder(x))
+   end
+   return IntervalBox(l)
+end
+
 act_gradient(act::NeuralVerification.Id, box::IntervalBox) = IntervalBox(interval(1), length(box))
 
 function Diagonal end
