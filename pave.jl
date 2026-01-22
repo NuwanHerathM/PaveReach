@@ -173,11 +173,11 @@ function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
         # G_minus = [interval(-∞, intervals[end-i].lo - ϵ) ∩ ϕ_bounds[end-i] for i in (qcp.n-1):-1:0]
-        G_minus = [interval(-1000, intervals[end-i].lo - ϵ) for i in (qcp.n-1):-1:0]
+        G_minus = [interval(-100000, intervals[end-i].lo - ϵ) for i in (qcp.n-1):-1:0]
         R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_minus...])
         test_minus = any(all(!isempty(R_inner_minus[i]) && interval(0, 0) ⊆ interval(min(R_inner_minus[i]), max(R_inner_minus[i])) for i in clause_indices) for clause_indices in problem.dnf_2_indices)
         # G_plus = [interval(intervals[end-i].hi + ϵ, ∞) ∩ ϕ_bounds[end-i] for i in (qcp.n-1):-1:0]
-        G_plus = [interval(intervals[end-i].hi + ϵ, 1000) for i in (qcp.n-1):-1:0]
+        G_plus = [interval(intervals[end-i].hi + ϵ, 100000) for i in (qcp.n-1):-1:0]
         R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_plus...])
         test_plus = any(all(!isempty(R_inner_plus[i]) && interval(0, 0) ⊆ interval(min(R_inner_plus[i]), max(R_inner_plus[i])) for i in clause_indices) for clause_indices in problem.dnf_2_indices)
         return test_minus || test_plus
@@ -272,8 +272,9 @@ check_is_out_1(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 1)
 check_is_out_2(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 2)
 
 function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
-    inn = []
+    @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
     @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
+    inn = []
     p_in_0 = deepcopy(p_in)
     p_out_0 = deepcopy(p_out)
     inn = []
