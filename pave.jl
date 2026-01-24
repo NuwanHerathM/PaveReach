@@ -4,6 +4,9 @@ using Plots
 include("genreach2.jl")
 include("quantifiedconstraintproblem.jl")
 
+const global minus_inf = -100000
+const global plus_inf = 100000
+
 # Paving
 
 function bisect_eps(interval, ϵ)
@@ -101,26 +104,90 @@ end
 
 increment!(indices, lengths, pos) = increment!(indices, lengths, pos, 0)
 
-function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, ϕ_bounds::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function complement(x::IntervalArithmetic.Interval; ϵ=0.0001)
+    l = []
+    if x.lo != minus_inf
+        push!(l, interval(minus_inf, x.lo - ϵ))
+    end
+    if x.hi != plus_inf
+        push!(l, interval(x.hi + ϵ, plus_inf))
+    end
+    return l
+end
+
+struct Component
+    interval::IntervalArithmetic.Interval
+    index::Int
+end
+
+function complement_conjunction_components(G::Vector{IntervalArithmetic.Interval{T}}, conjunction_indices::Vector{Int}) where T <: Number
+    l = []
+    for (i, index) in enumerate(conjunction_indices)
+        compl_G_i = complement(G[index])
+        for sub_compl_G_i in compl_G_i
+            sub_region = [Component(interval(minus_inf, plus_inf), j) for j in conjunction_indices]
+            sub_region[i] = Component(sub_compl_G_i, index)
+            push!(l, sub_region)
+        end
+    end
+    return l
+end
+
+function complement_disjunction(G::Vector{IntervalArithmetic.Interval{T}}, dnf_indices::Vector{Vector{Int}}) where T <: Number
+    conjunctions = []
+    for conjunction_indices in dnf_indices
+        compl = complement_conjunction_components(G, conjunction_indices)
+        push!(conjunctions, compl)
+    end
+
+    n = length(G)
+    conjunction_product = collect(Iterators.product(conjunctions...))
+    disjunction = []
+    for components in conjunction_product
+        comp = reduce(vcat, components)
+        filtered_intervals = []
+        for i in 1:n
+            ith_intervals = [c.interval for c in comp if c.index == i]
+            ith_interval =  reduce(intersect, ith_intervals; init=interval(minus_inf, plus_inf))
+            push!(filtered_intervals, ith_interval)
+        end
+        push!(disjunction, filtered_intervals)
+    end
+    return disjunction
+end
+
+function disjunction(G::Vector{IntervalArithmetic.Interval{T}}, dnf_indices::Vector{Vector{Int}}) where T <: Number
+    n = length(G)
+    disjunction = []
+    for conjunction_indices in dnf_indices
+        sub_region = repeat([interval(minus_inf, plus_inf)], n)
+        for i in conjunction_indices
+            sub_region[i] = G[i]
+        end
+        push!(disjunction, sub_region)
+    end
+    return disjunction
+end
+
+function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Forall, i) for i in 1:length(X)]..., qcp.qvs..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]..., qcp.qvs_relaxed[j]..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
-        # G = [intervals[end-i] ∩ ϕ_bounds[end-i] for i in (qcp.n-1):-1:0]
-        # display(G)
-        # if any(isempty, G)
-        #     return false
-        # end
-        # R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G...])
-        R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
-        # display(R_inner)
-        return any(all(!isempty(R_inner[i]) && interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in clause_indices) for clause_indices in problem.dnf_1_indices)
+        G = disjunction(last(intervals, qcp.n), problem.dnf_indices)
+        for G_i in G
+            R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_i...])
+            if all(!isempty(R_inner[i]) && interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qcp.n)
+                return true
+            end
+        end
+        return false
     end
 end
 
-function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, ϕ_bounds::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Exists, i) for i in 1:length(X)]..., negation.(qcp.qvs)..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -145,7 +212,7 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
     end
 end
 
-function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, ϕ_bounds::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Exists, i) for i in 1:length(X)]..., qcp.qvs..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -165,22 +232,21 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
     end
 end
 
-function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, ϕ_bounds::AbstractVector{IntervalArithmetic.Interval{T}}, ϵ::Float64=0.1)::Function where {T<:Number}
+function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, ϵ::Float64=0.0001)::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qcp.qvs)..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]..., negation.(qcp.qvs_relaxed[j])..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
-        # G_minus = [interval(-∞, intervals[end-i].lo - ϵ) ∩ ϕ_bounds[end-i] for i in (qcp.n-1):-1:0]
-        G_minus = [interval(-100000, intervals[end-i].lo - ϵ) for i in (qcp.n-1):-1:0]
-        R_inner_minus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_minus...])
-        test_minus = any(all(!isempty(R_inner_minus[i]) && interval(0, 0) ⊆ interval(min(R_inner_minus[i]), max(R_inner_minus[i])) for i in clause_indices) for clause_indices in problem.dnf_2_indices)
-        # G_plus = [interval(intervals[end-i].hi + ϵ, ∞) ∩ ϕ_bounds[end-i] for i in (qcp.n-1):-1:0]
-        G_plus = [interval(intervals[end-i].hi + ϵ, 100000) for i in (qcp.n-1):-1:0]
-        R_inner_plus, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_plus...])
-        test_plus = any(all(!isempty(R_inner_plus[i]) && interval(0, 0) ⊆ interval(min(R_inner_plus[i]), max(R_inner_plus[i])) for i in clause_indices) for clause_indices in problem.dnf_2_indices)
-        return test_minus || test_plus
+        G_complement = complement_disjunction(last(intervals, qcp.n), problem.dnf_indices)
+        for G_complement_i in G_complement
+            R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_complement_i...])
+            if all(!isempty(R_inner[i]) && interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qcp.n)
+                return true
+            end
+        end
+        return false
     end
 end
 
@@ -201,12 +267,11 @@ function check_is_in(X_0, p_in, G, qcp, criterion)
         is_in_intersection = true
         while is_in_intersection && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
             sub_interval = [[p_in[i][indices[i]] for i in 1:length(p_in)]..., G...]
-            ϕ_bounds = bounds(qcp.problem.ϕ, X_0, sub_interval[1:end-qcp.n])
             if criterion == 1
-                is_in = create_is_in_1(qcp, sub_interval, ϕ_bounds)
+                is_in = create_is_in_1(qcp, sub_interval)
             end
             if criterion == 2
-                is_in = create_is_in_2(qcp, sub_interval, ϕ_bounds)
+                is_in = create_is_in_2(qcp, sub_interval)
             end
             is_in_intersection &= is_in(X_0)
             if isempty(indices_forall)
@@ -242,13 +307,12 @@ function check_is_out(X_0, p_out, G, qcp, criterion)
         is_out_union = false
         while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
             sub_interval = [[p_out[i][indices[i]] for i in 1:length(p_out)]..., G...]
-            f_bounds = bounds(qcp.problem.f, X_0, sub_interval)
-            ϕ_bounds = bounds(qcp.problem.ϕ, X_0, sub_interval[1:end-qcp.n])
+            # f_bounds = bounds(qcp.problem.f, X_0, sub_interval)
             if criterion == 1
-                is_out = create_is_out_1(qcp, sub_interval, ϕ_bounds)
+                is_out = create_is_out_1(qcp, sub_interval)
             end
             if criterion == 2
-                is_out = create_is_out_2(qcp, sub_interval, ϕ_bounds, 0.00001)
+                is_out = create_is_out_2(qcp, sub_interval, 0.00001)
             end
             is_out_union |= is_out(X_0)
             increment!(indices, lengths, indices_forall)

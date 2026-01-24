@@ -48,9 +48,7 @@ end
 struct Problem
     f::Vector{Function}
     Df::Vector{Function}
-    ϕ::Vector{Function}
-    dnf_1_indices::Vector{Vector{Int}}
-    dnf_2_indices::Vector{Vector{Int}}
+    dnf_indices::Vector{Vector{Int}}
 end
 
 abstract type ConnectedProblem end
@@ -72,6 +70,10 @@ struct QuantifiedConstraintProblem
     qvs_relaxed::Vector{Vector{QuantifiedVariable}}
     p::Int
     n::Int
+    function QuantifiedConstraintProblem(problem::Union{Problem, ConnectedProblem}, qvs, qvs_relaxed, p::Int, n::Int)
+        @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to n."
+        new(problem, qvs, qvs_relaxed, p, n)
+    end
 end
 
 function QuantifiedConstraintProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
