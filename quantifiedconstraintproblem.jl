@@ -49,36 +49,47 @@ struct Problem
     f::Vector{Function}
     Df::Vector{Function}
     dnf_indices::Vector{Vector{Int}}
+    function Problem(f, Df, dnf_indices)
+        @assert length(f) == length(Df) "Number of functions and gradients must be equal."
+        n = length(f)
+        for indices in dnf_indices
+            for idx in indices
+                @assert 1 <= idx <= n "DNF index $idx out of bounds. There are $n functions."
+            end
+        end
+        new(f, Df, dnf_indices)
+    end
 end
 
-abstract type ConnectedProblem end
+# abstract type ConnectedProblem end
 
-struct AndProblem <: ConnectedProblem
-    problems::Vector{Union{Problem, ConnectedProblem}}
-end
+# struct AndProblem <: ConnectedProblem
+#     problems::Vector{Union{Problem, ConnectedProblem}}
+# end
 
-struct OrProblem <: ConnectedProblem
-    problems::Vector{Union{Problem, ConnectedProblem}}
-end
+# struct OrProblem <: ConnectedProblem
+#     problems::Vector{Union{Problem, ConnectedProblem}}
+# end
 
-problems(problem::ConnectedProblem) = problem.problems
-problems(problem::Problem) = [problem]
+# problems(problem::ConnectedProblem) = problem.problems
+# problems(problem::Problem) = [problem]
 
 struct QuantifiedConstraintProblem
-    problem::Union{Problem, ConnectedProblem}
+    problem::Problem
     qvs::Vector{QuantifiedVariable}
     qvs_relaxed::Vector{Vector{QuantifiedVariable}}
     p::Int
     n::Int
-    function QuantifiedConstraintProblem(problem::Union{Problem, ConnectedProblem}, qvs, qvs_relaxed, p::Int, n::Int)
-        @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to n."
+    function QuantifiedConstraintProblem(problem::Problem, qvs, qvs_relaxed, p::Int, n::Int)
+        @assert length(problem.f) == n "Number of functions in the problem should be equal to n = $n."
+        @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to n = $n."
         new(problem, qvs, qvs_relaxed, p, n)
     end
 end
 
-function QuantifiedConstraintProblem(f, Df, qvs::Vector{Any}, p::Int, n::Int)
+function QuantifiedConstraintProblem(f, Df, dnf_indices, qvs::Vector{Any}, p::Int, n::Int)
     @assert length(qvs) % 2 == 0 "Quantifier variables should be in pairs of (quantifier, index)."
-    problem = Problem(f, Df)
+    problem = Problem(f, Df, dnf_indices)
     for i in 1:2:length(qvs)
         quantifier = qvs[i]
         idx = qvs[i+1]

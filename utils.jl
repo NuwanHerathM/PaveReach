@@ -77,11 +77,11 @@ end
 # Needs correct rounding
 function sigmoidder(x::IntervalArithmetic.Interval{Float64})
     if x.hi < 0
-        return interval(sigmoidder(x.lo), sigmoidder(x.hi))
+        return interval(prevfloat(sigmoidder(x.lo)), nextfloat(sigmoidder(x.hi)))
     elseif x.lo > 0
-        return interval(sigmoidder(x.hi), sigmoidder(x.lo))
+        return interval(prevfloat(sigmoidder(x.hi)), nextfloat(sigmoidder(x.lo)))
     else
-        low = min(sigmoidder(x.lo), sigmoidder(x.hi))
+        low = prevfloat(min(sigmoidder(x.lo), sigmoidder(x.hi)))
         high = 0.25
         return interval(low, high)
     end
