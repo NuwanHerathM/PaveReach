@@ -30,7 +30,7 @@ function bisect_eps_quantifier!(intervals, qvs, eps, p, n, quantifier)
     pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
 
     for i in pos_quantifier
-        intervals[i] = bisect_eps(intervals[i][1], eps)
+        intervals[i] = bisect_eps(intervals[i][1], eps[i])
     end
 end
 
@@ -69,10 +69,12 @@ end
 #     intervals[pos_max] = parts
 # end
 
-function bisect_largest_quantifier!(intervals, qvs, p, n, quantifier)
+function bisect_largest_quantifier!(intervals, qvs, p, n, quantifier, ϵ)
     pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - n - length(qvs))
-    diams = [if (i in pos_quantifier) IntervalArithmetic.diam(first(intervals[i])) else -1 end for i in 1:length(intervals)]
-    (_, pos_max) = findmax(diams)
+    diams = [if (i in pos_quantifier) IntervalArithmetic.diam(first(intervals[i])) else -1.0 end for i in 1:length(intervals)]
+    is_not_bisectable = diams .< ϵ
+    diams[is_not_bisectable] .= -1.0
+    pos_max = argmax(diams)
     parts = []
     for interval in intervals[pos_max]
         a, b = IntervalArithmetic.bisect(interval)
@@ -82,8 +84,17 @@ function bisect_largest_quantifier!(intervals, qvs, p, n, quantifier)
     intervals[pos_max] = parts
 end
 
-bisect_largest_exists!(intervals, qvs, p, n) = bisect_largest_quantifier!(intervals, qvs, p, n, Exists)
-bisect_largest_forall!(intervals, qvs, p, n) = bisect_largest_quantifier!(intervals, qvs, p, n, Forall)
+bisect_largest_exists!(intervals, qvs, p, n, ϵ) = bisect_largest_quantifier!(intervals, qvs, p, n, Exists, ϵ)
+bisect_largest_forall!(intervals, qvs, p, n, ϵ) = bisect_largest_quantifier!(intervals, qvs, p, n, Forall, ϵ)
+
+function bisect_precision(box, ϵ)
+    diams = IntervalArithmetic.diam.(box)
+    is_not_bisectable = diams .< ϵ
+    copy_diams = [d for d in diams]
+    copy_diams[is_not_bisectable] .= -1.0
+    i = argmax(copy_diams)
+    return bisect(box, i)
+end
 
 function increment!(indices, lengths, pos, i)
     if length(pos) == 0
@@ -364,48 +375,48 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
                 push!(inn, X)
             elseif check_is_out(X, p_out, G, qcp)
                 push!(out, X)
-            elseif IntervalArithmetic.diam(X) < ϵ_x
+            elseif all(map(<, IntervalArithmetic.diam.(X), ϵ_x))
                 push!(delta, X)
             else
-                X_1, X_2 = bisect(X)
+                X_1, X_2 = bisect_precision(X, ϵ_x)
                 push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
                 push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
             end
         end
         if allow_exists_and_forall_bisection
-            p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in)); init=0.0)
-            p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out)); init=0.0)
-            p_max = maximum((p_in_max, p_out_max))
-            X_max = IntervalArithmetic.diam(X)
+            p_in_diams = IntervalArithmetic.diam.(first.(p_in))
+            p_out_diams = IntervalArithmetic.diam.(first.(p_out))
+            p_maxs = max.(p_in_diams, p_out_diams)
+            X_diams = IntervalArithmetic.diam.(X)
             if check_is_in(X, p_in, G, qcp)
                 push!(inn, X)
             elseif check_is_out(X, p_out, G, qcp)
                 push!(out, X)
-            elseif X_max < ϵ_x && p_max < ϵ_p
+            elseif all(map(<, X_diams, ϵ_x)) && all(map(<, p_maxs, ϵ_p))
                 push!(delta, X)
-            elseif X_max >= ϵ_x && p_max < ϵ_p
-                X_1, X_2 = bisect(X)
+            elseif any(map(>=, X_diams, ϵ_x)) && all(map(<, p_maxs, ϵ_p))
+                X_1, X_2 = bisect_precision(X, ϵ_x)
                 push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
                 push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
-            elseif X_max < ϵ_x && p_max >= ϵ_p
-                if ϵ_p <= p_in_max
-                    bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
+            elseif all(map(<, X_diams, ϵ_x)) && any(map(>=, p_maxs, ϵ_p))
+                if any(map(<=, ϵ_p, p_in_diams))
+                    bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                 end
-                if ϵ_p <= p_out_max
-                    bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
+                if any(map(<=, ϵ_p, p_out_diams))
+                    bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                 end
                 push!(list, (X, p_in, p_out))
             else
-                if X_max < p_max
-                    if ϵ_p <= p_in_max
-                        bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
+                if maximum(X_diams) < maximum(p_maxs)
+                    if any(map(<=, ϵ_p, p_in_diams))
+                        bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                     end
-                    if ϵ_p <= p_out_max
-                        bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
+                    if any(map(<=, ϵ_p, p_out_diams))
+                        bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                     end
                     push!(list, (X, p_in, p_out))
                 else
-                    X_1, X_2 = bisect(X)
+                    X_1, X_2 = bisect_precision(X, ϵ_x)
                     push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
                     push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
                 end
@@ -414,39 +425,41 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
         if allow_exists_or_forall_bisection
             indices_forall = [i for (q, i) in qcp.qvs if q == Forall] .- length(X)
             indices_exists = [i for (q, i) in qcp.qvs if q == Exists] .- length(X)
-            p_in_max = maximum(IntervalArithmetic.diam.(first.(p_in[indices_exists])); init=0.0)
-            p_out_max = maximum(IntervalArithmetic.diam.(first.(p_out[indices_forall])); init=0.0)
-            p_max = maximum((p_in_max, p_out_max))
-            X_max = IntervalArithmetic.diam(X)
+            p_in_diams = IntervalArithmetic.diam.(first.(p_in))
+            p_in_diams[indices_forall] .= -1.0
+            p_out_diams = IntervalArithmetic.diam.(first.(p_out))
+            p_out_diams[indices_exists] .= -1.0
+            p_maxs = max.(p_in_diams, p_out_diams)
+            X_diams = IntervalArithmetic.diam.(X)
             if check_is_in(X, p_in, G, qcp)
                 push!(inn, X)
             elseif check_is_out(X, p_out, G, qcp)
                 push!(out, X)
-            elseif X_max < ϵ_x && p_max < ϵ_p
+            elseif all(map(<, X_diams, ϵ_x)) && all(map(<, p_maxs, ϵ_p))
                 push!(delta, X)
-            elseif X_max >= ϵ_x && p_max < ϵ_p
-                X_1, X_2 = bisect(X)
+            elseif any(map(>=, X_diams, ϵ_x)) && all(map(<, p_maxs, ϵ_p))
+                X_1, X_2 = bisect_precision(X, ϵ_x)
                 push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
                 push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
-            elseif X_max < ϵ_x && p_max >= ϵ_p
-                if ϵ_p <= p_in_max
-                    bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
+            elseif all(map(<, X_diams, ϵ_x)) && any(map(>=, p_maxs, ϵ_p))
+                if any(map(<=, ϵ_p, p_in_diams))
+                    bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                 end
-                if ϵ_p <= p_out_max
-                    bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
+                if any(map(<=, ϵ_p, p_out_diams))
+                    bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                 end
                 push!(list, (X, p_in, p_out))
             else
-                if X_max < p_max
-                    if ϵ_p <= p_in_max
-                        bisect_largest_exists!(p_in, qcp.qvs, qcp.p, qcp.n)
+                if maximum(X_diams) < maximum(p_maxs)
+                    if any(map(<=, ϵ_p, p_in_diams))
+                        bisect_largest_exists!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                     end
-                    if ϵ_p <= p_out_max
-                        bisect_largest_forall!(p_out, qcp.qvs, qcp.p, qcp.n)
+                    if any(map(<=, ϵ_p, p_out_diams))
+                        bisect_largest_forall!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
                     end
                     push!(list, (X, p_in, p_out))
                 else
-                    X_1, X_2 = bisect(X)
+                    X_1, X_2 = bisect_precision(X, ϵ_x)
                     push!(list, (X_1, deepcopy(p_in_0), deepcopy(p_out_0)))
                     push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
                 end
