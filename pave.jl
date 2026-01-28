@@ -481,6 +481,50 @@ pave_12(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, a
 pave_21(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_2, check_is_out_1)
 pave_22(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_2, check_is_out_2)
 
+function bisection_slice(box, ϵ)
+    diams = IntervalArithmetic.diam.(box)
+    is_not_bisectable = diams .< ϵ
+    copy_diams = [d for d in diams]
+    copy_diams[is_not_bisectable] .= -1.0
+    pos_max = argmax(copy_diams)
+    mid_max = mid(box[pos_max])
+    l = []
+    for i in 1:length(box)
+        if i != pos_max
+            push!(l, box[i])
+        else
+            push!(l, interval(mid_max, mid_max))
+        end
+    end
+    return pos_max, IntervalBox(l)
+end
+
+function decrease(box, i)
+    box_1, box_2 = bisect(box, i)
+    return box_1
+end
+
+function increase(box, i)
+    box_1, box_2 = bisect(box, i)
+    return box_2
+end
+
+function monotony(signs, i)
+    if signs[i] > 0
+        return increase
+    else
+        return decrease
+    end
+end
+
+function antimonotony(signs, i)
+    if signs[i] > 0
+        return decrease
+    else
+        return increase
+    end
+end
+
 function pave_monotonous(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out) where {N, T<:Number}
     @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
     @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
@@ -514,49 +558,30 @@ function pave_monotonous(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G
     delta = []
     X_in = X
     X_out = deepcopy(X)
-    list = [(X_in, X_out, p_in, p_out)]
+    list = [(X, p_in, p_out)]
     while !isempty(list)
-        X_in, X_out, p_in, p_out = pop!(list)
+        X, p_in, p_out = pop!(list)
         if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
             error("TO DO")
         end
         if allow_exists_and_forall_bisection
-            if !isempty(X_in)
-                X_in_mid = IntervalBox(mid(X_in))
-                if check_is_in(X_in_mid, p_in, G, qcp)
-                    push!(inn, X_in_mid[1])
-                    if any(map(>=, IntervalArithmetic.diam.(X_in), ϵ_x))
-                        new_X_in, _ = bisect_precision(X_in, ϵ_x)
-                    else
-                        new_X_in = IntervalBox(emptyinterval())
-                    end
-                elseif any(map(>=, IntervalArithmetic.diam.(X_in), ϵ_x))
-                    _, new_X_in = bisect_precision(X_in, ϵ_x)
-                else
-                    new_X_in = IntervalBox(emptyinterval())
-                end
-            else
-                new_X_in = IntervalBox(emptyinterval())
+            if all(map(<, IntervalArithmetic.diam.(X), ϵ_x))
+                push!(delta, X)
+                continue
             end
-            if !isempty(X_out)
-                X_out_mid = IntervalBox(mid(X_out))
-                if check_is_out(X_out_mid, p_out, G, qcp)
-                    push!(out, X_out_mid[1])
-                    if any(map(>=, IntervalArithmetic.diam.(X_out), ϵ_x))
-                        _, new_X_out = bisect_precision(X_out, ϵ_x)
-                    else
-                        new_X_out = IntervalBox(emptyinterval())
-                    end
-                elseif any(map(>=, IntervalArithmetic.diam.(X_out), ϵ_x))
-                    new_X_out, _ = bisect_precision(X_out, ϵ_x)
-                else
-                    new_X_out = IntervalBox(emptyinterval())
-                end
+            X_mid = IntervalBox(mid(X))
+            if check_is_in(X_mid, p_in, G, qcp)
+                X_1, X_2 = bisect_precision(X, ϵ_x)
+                push!(inn, X_2)
+                push!(list, (X_1, p_in, p_out))
+            elseif check_is_out(X_mid, p_out, G, qcp)
+                X_1, X_2 = bisect_precision(X, ϵ_x)
+                push!(out, X_1)
+                push!(list, (X_2, p_in, p_out))
             else
-                new_X_out = IntervalBox(emptyinterval())
-            end
-            if !isempty(new_X_in) || !isempty(new_X_out)
-                push!(list, (new_X_in, new_X_out, p_in, p_out))
+                X_1, X_2 = bisect_precision(X, ϵ_x)
+                push!(list, (X_1, p_in, p_out))
+                push!(list, (X_2, p_in, p_out))
             end
         end
         if allow_exists_or_forall_bisection
