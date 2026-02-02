@@ -403,23 +403,23 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
                 push!(list, (X_2, deepcopy(p_in_0), deepcopy(p_out_0)))
             elseif all(map(<, X_diams, ϵ_x)) && any(map(>=, p_maxs, ϵ_p))
                 if any(map(<=, ϵ_p, p_in_diams))
-                    # bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
-                    bisect_eps_forall!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+                    bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
+                    # bisect_eps_forall!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
                 end
                 if any(map(<=, ϵ_p, p_out_diams))
-                    # bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
-                    bisect_eps_exists!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+                    bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
+                    # bisect_eps_exists!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
                 end
                 push!(list, (X, p_in, p_out))
             else
                 if maximum(X_diams) < maximum(p_maxs)
                     if any(map(<=, ϵ_p, p_in_diams))
-                        # bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
-                        bisect_eps_forall!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+                        bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n, ϵ_p)
+                        # bisect_eps_forall!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
                     end
                     if any(map(<=, ϵ_p, p_out_diams))
-                        # bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
-                        bisect_eps_exists!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+                        bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n, ϵ_p)
+                        # bisect_eps_exists!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
                     end
                     push!(list, (X, p_in, p_out))
                 else
@@ -549,8 +549,8 @@ function pave_monotonous(X::IntervalArithmetic.IntervalBox{N, T}, optimization_d
     inn = []
     out = []
     delta = []
-    X_in = X
-    X_out = deepcopy(X)
+    # X_in = X
+    # X_out = deepcopy(X)
     list = [(X, p_in, p_out)]
     while !isempty(list)
         X, p_in, p_out = pop!(list)

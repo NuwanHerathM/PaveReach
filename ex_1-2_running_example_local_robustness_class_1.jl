@@ -18,14 +18,14 @@ function parse_commandline()
             help = "input y coordinate"
             arg_type = Float64
             required = true
-        "eps_x"
-            help = "epsilon for the paving"
-            arg_type = Float64
-            required = true
-        "eps_p"
-            help = "epsilon for the parameters"
-            arg_type = Float64
-            required = false
+        # "eps_x"
+        #     help = "epsilon for the paving"
+        #     arg_type = Float64
+        #     required = true
+        # "eps_p"
+        #     help = "epsilon for the parameters"
+        #     arg_type = Float64
+        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
@@ -45,8 +45,10 @@ parsed_args = parse_commandline()
 input_x = parsed_args["x"]
 input_y = parsed_args["y"]
 
-ϵ_x = parsed_args["eps_x"]
-ϵ_p = parsed_args["eps_p"]
+# ϵ_x = parsed_args["eps_x"]
+# ϵ_p = parsed_args["eps_p"]
+ϵ_x = [0.05]
+ϵ_p = nothing
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
 
@@ -78,7 +80,7 @@ function perturbation(x)
 end
 
 function gradient_perturbation(x)
-    return [x[1]*x[2] x[2]*x[1] 0; x[1]*x[3] 0 x[3]*x[1]]
+    return [x[2] x[1] 0; x[3] 0 x[1]]
 end
 
 n = 1

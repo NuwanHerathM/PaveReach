@@ -14,14 +14,14 @@ function parse_commandline()
             help = "confidence delta"
             arg_type = Float64
             required = true
-        "eps_x"
-            help = "epsilon for the paving"
-            arg_type = Float64
-            required = true
-        "eps_p"
-            help = "epsilon for the parameters"
-            arg_type = Float64
-            required = false
+        # "eps_x"
+        #     help = "epsilon for the paving"
+        #     arg_type = Float64
+        #     required = true
+        # "eps_p"
+        #     help = "epsilon for the parameters"
+        #     arg_type = Float64
+        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
@@ -40,8 +40,10 @@ parsed_args = parse_commandline()
 # ------------------------------------------------------
 δ = parsed_args["delta"]
 
-ϵ_x = parsed_args["eps_x"]
-ϵ_p = parsed_args["eps_p"]
+# ϵ_x = parsed_args["eps_x"]
+# ϵ_p = parsed_args["eps_p"]
+ϵ_x = [0.05, 0.05]
+ϵ_p = nothing
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
 
@@ -87,7 +89,12 @@ p_in = [[interval(-ϵ_max, ϵ_max)], [interval(-ϵ_max, ϵ_max)]]
 p_out = deepcopy(p_in)
 G = [interval(minus_inf, δ - 0.0001), interval(0.0001, plus_inf)]
 
-inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+using TimerOutputs
+const to = TimerOutput()
+
+@timeit to "pave" inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+
+show(to)
 
 if parsed_args["save"]
     p = plot()

@@ -94,7 +94,7 @@ p_in = [[interval(-2/149, 2/149)]]
 p_out = deepcopy(p_in)
 G = [interval(minus_inf, δ - 0.0001), interval(0.0001, plus_inf)]
 
-inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+@btime(global inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
 
 if parsed_args["save"]
     p = plot()
