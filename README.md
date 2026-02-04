@@ -29,6 +29,8 @@ The scripts `Fig<n>.sh` where `<n>` is in {3, 4, ..., 9} produce  `.png` files i
 
 The scripts `Tab<n>.sh` where `<n>` is in {3, 4, 5} produce `.log` reports in order to construct the corresponding tables.
 
+> Note: Timings of our algorithm are obtained with the macro `@btime` from `BenchmarkTools`. The execution time might be long due to the number of samples that are taken into account. In the files `ex_5-...`, that number is set with the field `samples` at the end of the line starting with `@btime`. Feel free to set `samples=1` if you just wish to have a general idea of the timings. Otherwise, beware that running some of the following benchmarks may take some considerable time.
+
 ### Building the Docker image
 
 Get in the root directory, where you can find the `Dockerfile` file. Build the image that we will name `globalqe`:
@@ -43,7 +45,7 @@ Change the mode of the scripts to execute:
 chmod +x Fig{3,4,5,6,7,8,9}.sh Tab{3,4,5}.sh
 ```
 
-> Note: The output figures are generated with `Luxor` when using the Doker image, while they where generated with `Plots` in the article. The results are the same, only the vizualisation differ. This choice was made due to technical reason: it is possible to generate the exact output with the Julia files directly.
+> Note: The output figures are generated with `Luxor` when using the Doker image, while they where generated with `Plots` in the article. The results are the same, only the vizualisation differs. This choice was made due to technical reasons: it is possible to generate the exact output with the Julia files directly.
 
 #### Figure 3
 

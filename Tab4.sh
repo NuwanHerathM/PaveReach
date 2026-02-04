@@ -3,7 +3,7 @@
 outfile=Tab4.log
 rm -f $outfile
 
-filename=ex_5-1_running_example
+filename=ex_5-1_running_example_no_timing
 
 o_in=1
 o_out=1

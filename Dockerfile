@@ -5,6 +5,7 @@ WORKDIR /app
 # Copy Julia script into the container
 COPY /src /app/src
 COPY /examples/ex_5-1_running_example.jl /app/examples/ex_5-1_running_example.jl 
+COPY /examples/ex_5-1_running_example_no_timing.jl /app/examples/ex_5-1_running_example_no_timing.jl 
 COPY /examples/ex_5-2_stability_controller.jl /app/examples/ex_5-2_stability_controller.jl
 COPY /examples/ex_5-3_dubins.jl /app/examples/ex_5-3_dubins.jl
 COPY /examples/ex_5-4_circle_collision.jl /app/examples/ex_5-4_circle_collision.jl

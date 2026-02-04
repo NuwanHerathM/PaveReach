@@ -56,7 +56,7 @@ println("ϵ_x = ", ϵ_x)
 is_refined = false
 allow_normal_p_bisect = false
 
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect))
+@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect)) samples=10
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 outfile = "$(filename)_$(ϵ_x).png"
