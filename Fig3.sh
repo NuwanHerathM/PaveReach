@@ -7,5 +7,5 @@ o_out=1
 for eps in 0.1 0.01 0.001
 do
     echo "$o_in, $o_out, $eps"
-    julia ${filename}.jl $o_in $o_out $eps --save
+    julia ${filename}.jl $o_in $o_out $eps --with_luxor
 done

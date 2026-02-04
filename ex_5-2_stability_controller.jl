@@ -15,8 +15,11 @@ function parse_commandline()
             help = "epsilon for the paving"
             arg_type = Float64
             required = true
-        "--save"
-            help = "save the output"
+        "--with_plots"
+            help = "generate the output with Plots.jl"
+            action = :store_true
+        "--with_luxor"
+            help = "generate the output with Luxor.jl"
             action = :store_true
     end
 
@@ -24,6 +27,11 @@ function parse_commandline()
 end
 
 parsed_args = parse_commandline()
+# ------------------------------------------------------
+use_plots = parsed_args["with_plots"]
+use_luxor = parsed_args["with_luxor"]
+
+@assert nand(use_plots, use_luxor) "Plots and Luxor are mutually exclusive. Use --help for more information."
 # ------------------------------------------------------
 
 filename = splitext(PROGRAM_FILE)[1]
@@ -51,13 +59,22 @@ allow_normal_p_bisect = false
 @btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, is_refined, allow_normal_p_bisect))
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
-if parsed_args["save"]
+outfile = "$(filename)_$(ϵ_x).png"
+
+if use_plots
     p = plot()
     draw(p, X_0, inn, out, delta)
-
     plot(p)
-
-    outfile = "$(filename)_$(ϵ_x).png"
     savefig(outfile)
+    println("The result was saved in $(outfile).")
+end
+
+if use_luxor
+    width = 600
+    height = 600
+    buffer = 50
+    Drawing(width + 2*buffer, height + 2*buffer, outfile)
+    luxor_draw(X_0, inn, out, delta, width, height, buffer)
+    finish()
     println("The result was saved in $(outfile).")
 end

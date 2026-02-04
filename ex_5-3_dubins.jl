@@ -34,8 +34,11 @@ function parse_commandline()
         "--subdivide", "-s"
             help = "subdivide the parameters"
             action = :store_true
-        "--save"
-            help = "save the output"
+        "--with_plots"
+            help = "generate the output with Plots.jl"
+            action = :store_true
+        "--with_luxor"
+            help = "generate the output with Luxor.jl"
             action = :store_true
     end
 
@@ -59,6 +62,11 @@ else
     end
 end
 @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
+
+use_plots = parsed_args["with_plots"]
+use_luxor = parsed_args["with_luxor"]
+
+@assert nand(use_plots, use_luxor) "Plots and Luxor are mutually exclusive. Use --help for more information."
 # ------------------------------------------------------
 
 filename = splitext(PROGRAM_FILE)[1]
@@ -126,24 +134,43 @@ println("ϵ_p = ", ϵ_p)
 print_inn_out_delta(inn, out, delta)
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
-if parsed_args["save"]
+
+if parsed_args["x"]
+    outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_x.png"
+end
+if parsed_args["y"]
+    outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_y.png"
+end
+if parsed_args["theta"]
+    outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_theta.png"
+end
+
+if use_plots
     p = plot()
     draw(p, X_0, inn, out, delta)
 
     if parsed_args["x"]
         title!(p, L"$x$")
-        plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
-        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_x.png"
+        Plots.plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
     end
     if parsed_args["y"]
         title!(p, L"$y$")
-        plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
-        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_y.png"
+        Plots.plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
     end
     if parsed_args["theta"]
         title!(p, L"$\theta$")
-        plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
-        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_theta.png"
+        Plots.plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=14)
     end
     savefig(outfile)
+    println("The result was saved in $(outfile).")
+end
+
+if use_luxor
+    width = 600
+    height = 40
+    buffer = 50
+    Drawing(width + 2*buffer, height + 2*buffer, outfile)
+    luxor_draw(X_0, inn, out, delta, width, height, buffer)
+    finish()
+    println("The result was saved in $(outfile).")
 end

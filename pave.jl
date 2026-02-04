@@ -1,5 +1,6 @@
-# using IntervalArithmetic
 using Plots
+using Luxor
+using MathTeXEngine
 
 include("genreach2.jl")
 include("quantifiedconstraintproblem.jl")
@@ -429,6 +430,8 @@ function merge_intervals(intervals)
     return merged
 end
 
+## Plots drawing
+
 rectangle(p, q) = Shape([p[1],q[1],q[1],p[1]], [p[2],p[2],q[2],q[2]])
 
 function draw_lines(pl, intervals, color)
@@ -491,4 +494,88 @@ end
 
 function print_delta_width(delta)
     Base.println("Width of delta regions: ", IntervalArithmetic.diam.(merge_intervals([box[1] for box in delta])))
+end
+
+## Luxor drawing
+
+function luxor_box2pq(box)
+    x = box[1]
+    y = box[2]
+    p = Point(x.lo, y.lo)
+    q = Point(x.hi, y.hi)
+    return p, q
+end
+
+function luxor_rescale(p, q, X_0, width, height, buffer)
+    if isa(X_0, IntervalBox{1, <:Number})
+        scale_x = width / (X_0[1].hi - X_0[1].lo)
+        scale_y = height / 0.2
+        p_rescaled = Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y + 0.1) * scale_y)
+        q_rescaled = Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y + 0.1) * scale_y)
+    elseif isa(X_0, IntervalBox{2, <:Number})
+        scale_x = width / (X_0[1].hi - X_0[1].lo)
+        scale_y = height / (X_0[2].hi - X_0[2].lo)
+        p_rescaled = Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y - X_0[2].lo) * scale_y)
+        q_rescaled = Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y - X_0[2].lo) * scale_y)
+    end
+    return p_rescaled, q_rescaled
+end
+
+function luxor_rescaled_pq(box, X_0, width, height, buffer)
+    p, q = luxor_box2pq(box)
+    return luxor_rescale(p, q, X_0, width, height, buffer)
+end
+
+function luxor_draw_rows(boxes, color, X_0, width, height, buffer)
+    sethue(color)
+    for box in boxes
+        p = Point(box[1].lo, -0.1)
+        q = Point(box[1].hi, 0.1)
+        p_rescaled, q_rescaled = luxor_rescale(p, q, X_0, width, height, buffer)
+        Luxor.box(p_rescaled, q_rescaled, :fill)
+    end
+end
+
+luxor_draw_inn_rows(inn, X_0, width, height, buffer) = luxor_draw_rows(inn, "green", X_0, width, height, buffer)
+luxor_draw_out_rows(out, X_0, width, height, buffer) = luxor_draw_rows(out, "cyan", X_0, width, height, buffer)
+luxor_draw_delta_rows(delta, X_0, width, height, buffer) = luxor_draw_rows(delta, "yellow", X_0, width, height, buffer)
+
+function luxor_draw_boxes(boxes, color, X_0, width, height, buffer)
+    sethue(color)
+    for box in boxes
+        p, q = luxor_rescaled_pq(box, X_0, width, height, buffer)
+        Luxor.box(p, q, :fill)
+    end
+end
+
+luxor_draw_inn_boxes(inn, X_0, width, height, buffer) = luxor_draw_boxes(inn, "green", X_0, width, height, buffer)
+luxor_draw_out_boxes(out, X_0, width, height, buffer) = luxor_draw_boxes(out, "cyan", X_0, width, height, buffer)
+luxor_draw_delta_boxes(delta, X_0, width, height, buffer) = luxor_draw_boxes(delta, "yellow", X_0, width, height, buffer)
+
+function luxor_draw(X_0, inn, out, delta, width, height, buffer)
+    if isa(X_0, IntervalBox{1, <:Number})
+        background("white")
+
+        luxor_draw_inn_rows(inn, X_0, width, height, buffer)
+        luxor_draw_out_rows(out, X_0, width, height, buffer)
+        luxor_draw_delta_rows(delta, X_0, width, height, buffer)
+
+        sethue("black")
+        # xticks
+        tickline(Point(buffer, buffer + height), Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
+    elseif isa(X_0, IntervalBox{2, <:Number})
+        background("white")
+
+        luxor_draw_inn_boxes(inn, X_0, width, height, buffer)
+        luxor_draw_out_boxes(out, X_0, width, height, buffer)
+        luxor_draw_delta_boxes(delta, X_0, width, height, buffer)
+
+        sethue("black")
+        # xticks
+        tickline(Point(buffer, buffer + height), Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
+        # yticks
+        tickline(Point(buffer + width, buffer + height), Point(buffer + width, buffer), startnumber= X_0[2].lo, finishnumber=X_0[2].hi, major=4, minor=0)
+    else
+        error("Plotting is only supported for 1D and 2D problems.")
+    end
 end

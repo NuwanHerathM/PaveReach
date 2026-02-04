@@ -34,8 +34,11 @@ function parse_commandline()
         "--subdivide", "-s"
             help = "bisect the parameters with either ∀ or ∃, requires eps_p, does not work with --refine"
             action = :store_true
-        "--save"
-            help = "save the output"
+        "--with_plots"
+            help = "generate the output with Plots.jl"
+            action = :store_true
+        "--with_luxor"
+            help = "generate the output with Luxor.jl"
             action = :store_true
     end
 
@@ -62,6 +65,11 @@ else
     end
 end
 @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
+
+use_plots = parsed_args["with_plots"]
+use_luxor = parsed_args["with_luxor"]
+
+@assert nand(use_plots, use_luxor) "Plots and Luxor are mutually exclusive. Use --help for more information."
 # ------------------------------------------------------
 
 filename = splitext(PROGRAM_FILE)[1]
@@ -125,25 +133,36 @@ else
     end
 end
 
-plot_title = L"$\mathcal{O}^{IN}$ " * lemma_in * L", $\mathcal{O}^{OUT}$ " * lemma_out
-
 @btime (global inn, out, delta = paving_function(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
-if parsed_args["save"]
+if allow_exists_and_forall_bisection
+    outfile = "$(filename)_$(o_in)$(o_out)_$(ϵ_x)_$(ϵ_p)_refined.png"
+elseif allow_exists_or_forall_bisection
+    outfile = "$(filename)_$(o_in)$(o_out)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
+else
+    outfile = "$(filename)_$(o_in)$(o_out)_$(ϵ_x).png"
+end
+
+if use_plots
     p = plot()
+    plot_title = L"$\mathcal{O}^{IN}$ " * lemma_in * L", $\mathcal{O}^{OUT}$ " * lemma_out
     title!(p, plot_title)
     draw(p, X_0, inn, out, delta)
-
     plot(p, size=(600, 80), grid=false, titlelocation = :left, topmargin=5mm, titlefontsize=12)
-
-    if allow_exists_and_forall_bisection
-        outfile = "$(filename)_$(o_in)$(o_out)_$(ϵ_x)_$(ϵ_p)_refined.png"
-    elseif allow_exists_or_forall_bisection
-        outfile = "$(filename)_$(o_in)$(o_out)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
-    else
-        outfile = "$(filename)_$(o_in)$(o_out)_$(ϵ_x).png"
-    end
     savefig(outfile)
+    println("The result was saved in $(outfile).")
+end
+
+if use_luxor
+    width = 600
+    height = 40
+    buffer = 50
+    Drawing(width + 2*buffer, height + 2*buffer, outfile)
+    luxor_draw(X_0, inn, out, delta, width, height, buffer)
+    fontsize(16)
+    plot_title = L"\mathcal{O}^{IN}~%$(lemma_in), \mathcal{O}^{OUT}~%$(lemma_out)"
+    Luxor.text(plot_title, Point(buffer, buffer/2), valign = :middle)
+    finish()
     println("The result was saved in $(outfile).")
 end
