@@ -1,4 +1,4 @@
-include("pave.jl")
+include("../src/pave.jl")
 
 # ------------------------------------------------------
 using ArgParse

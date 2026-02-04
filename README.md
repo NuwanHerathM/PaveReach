@@ -132,19 +132,21 @@ Data (undecided region) to produce Table 5 is saved in `Tab5.log` in the root di
 ### List of the packages
 
 For `GenReach`
-* `IntervalArithmetic`
-* `LazySets`
-* `Polyhedra`
-* `StaticArrays`
-* `Symbolics`
-* `CDDLib`
+* `IntervalArithmetic` v0.21.2
+* `LazySets` v2.14.2
+* `Polyhedra` v0.8.1
+* `StaticArrays` v1.9.16
+* `Symbolics` v6.31.0
+* `CDDLib` v0.10.2
 
 For `PaveReach`
-* `Match`
-* `Plots`
-* `ArgParse`
-* `LaTeXStrings`
-* `BenchmarkTools`
+* `Match` v2.4.1
+* `Plots` v1.41.5
+* `ArgParse` v1.2.0
+* `LaTeXStrings` v1.4.0
+* `BenchmarkTools` v1.6.3
+* `Luxor` v4.3.0
+* `MathTeXEngine` v0.6.7
 
 ### Adding a package
 
@@ -163,7 +165,7 @@ pkg> add <name_of_the_package>
 ```
 Or add all the packages at once.
 ```julia
-pkg> add IntervalArithmetic LazySets Polyhedra StaticArrays Symbolics CDDLib Match Plots ArgParse LaTeXStrings BenchmarkTools
+pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
 
