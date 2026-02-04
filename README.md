@@ -43,6 +43,8 @@ Change the mode of the scripts to execute:
 chmod +x Fig{3,4,5,6,7,8,9}.sh Tab{3,4,5}.sh
 ```
 
+> Note: The output figures are generated with `Luxor` when using the Doker image, while they where generated with `Plots` in the article. The results are the same, only the vizualisation differ. This choice was made due to technical reason: it is possible to generate the exact output with the Julia files directly.
+
 #### Figure 3
 
 Run
@@ -188,7 +190,7 @@ You will find the output in a file named `ex_0-1_disk_11_0.1_0.5_subdivided.png`
 
 Run
 ```
-julia ex_5-1_running_example.jl 1 1 0.1 --save
+julia ex_5-1_running_example.jl 1 1 0.1 --with_plots
 ```
 It should return (with the execution time instead of `<time>`):
 ```
