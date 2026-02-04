@@ -1,6 +1,6 @@
 #!/bin/bash
 
-outfile=Tab6.log
+outfile=Tab3.log
 rm -f $outfile
 
 filename=ex_5-1_running_example
@@ -14,14 +14,14 @@ for idx in "${!list_eps_x[@]}"; do
     eps_x=${list_eps_x[$idx]}
     eps_p=$eps_x
     echo "$eps_x, $eps_p"
-    echo "Subdividing no paramater"
-    res=$(julia ${filename}.jl $o_in $o_out $eps_x $eps_p 2>&1)
+    echo "Subdividing no parameter"
+    res=$(docker run -v .:/app globalqe examples/${filename}.jl $o_in $o_out $eps_x 2>&1)
     echo $res >> $outfile
     echo "Subdividing either existentially or universally quantified parameters"
-    res=$(julia ${filename}.jl $o_in $o_out $eps_x $eps_p -s 2>&1)
+    res=$(docker run -v .:/app globalqe examples/${filename}.jl $o_in $o_out $eps_x $eps_p -s 2>&1)
     echo $res >> $outfile
     echo "Combining the subdivision of existentially and universally quantified parameters"
-    res=$(julia ${filename}.jl $o_in $o_out $eps_x $eps_p -r 2>&1)
+    res=$(docker run -v .:/app globalqe examples/${filename}.jl $o_in $o_out $eps_x $eps_p -r 2>&1)
     echo $res >> $outfile
 done
 echo "Results were saved in $outfile."

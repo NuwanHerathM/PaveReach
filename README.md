@@ -23,6 +23,106 @@ For a quantified set $\Sigma$, the paving function `paving11` returns
 
 For the different paving functions, see [Oracles](#oracles).
 
+## Reproducing associated experimental results (figures and tables) with a Docker image
+
+The scripts `Fig<n>.sh` where `<n>` is in {3, 4, ..., 9} produce  `.png` files in order to construct the corresponding figures.
+
+The scripts `Tab<n>.sh` where `<n>` is in {3, 4, 5} produce `.log` reports in order to construct the corresponding tables.
+
+### Building the Docker image
+
+Get in the root directory, where you can find the `Dockerfile` file. Build the image that we will name `globalqe`:
+```
+docker build -t globalqe .
+```
+
+### Running the experiments
+
+Change the mode of the scripts to execute:
+```
+chmod +x Fig{3,4,5,6,7,8,9}.sh Tab{3,4,5}.sh
+```
+
+#### Figure 3
+
+Run
+```
+./Fig3.sh
+```
+`ex_5-1_running_example_11_0.1.png` ($\epsilon_\mathbb{X} = 0.1$), `ex_5-1_running_example_11_0.01.png` ($\epsilon_\mathbb{X} = 0.01$) and `ex_5-1_running_example_11_0.001.png` ($\epsilon_\mathbb{X} = 0.001$) appear in `examples/`.
+
+#### Figure 4
+
+Run
+```
+./Fig4.sh
+```
+`ex_5-1_running_example_11_0.001.png` (Lemmas 3.1 and 3.2), `ex_5-1_running_example_11_0.001_subdivided.png` (Lemmas 4.2 and 4.3) and `ex_5-1_running_example_11_0.001_refined.png` (Lemmas 4.4 and 4.5) appear in `examples/`.
+
+#### Figure 5
+
+Run
+```
+./Fig5.sh
+```
+`ex_5-2_stability_controller_0.1.png` appears in `examples/`.
+
+#### Figure 6
+
+Run
+```
+./Fig6.sh
+```
+`ex_5-3_dubins_0.01_nothing_x.png` ($x$), `ex_5-3_dubins_0.01_nothing_y.png` ($y$) and `ex_5-3_dubins_0.01_nothing_theta.png` ($\theta$) appears in `examples/`.
+
+#### Figure 7
+
+Run
+```
+./Fig7.sh
+```
+`ex_5-4_circle_collision_0.1_0.1_refined.png` appears in `examples/`.
+
+#### Figure 8
+
+Run
+```
+./Fig8.sh
+```
+`ex_5-5_robot_collision_0.01_0.01_refined.png` appears in `examples/`.
+
+#### Figure 9
+
+Run
+```
+./Fig9.sh
+```
+`ex_5-5_robot_collision_11_0.1.png` (Lemmas 3.1 and 3.2), `ex_5-5_robot_collision_11_0.1_0.1_subdivided.png` (Lemmas 4.2 and 4.3) and `ex_5-5_robot_collision_11_0.1_0.1_refined.png` (Lemmas 4.4 and 4.5) appear in `examples/`.
+
+#### Table 3
+
+Run
+```
+./Tab3.sh
+```
+Data (undecided region and timing) to produce Table 3 is saved in `Tab3.log` in the root directory.
+
+#### Table 4
+
+Run
+```
+./Tab4.sh
+```
+Data (undecided region) to produce Table 4 is saved in `Tab4.log` in the root directory.
+
+#### Table 5
+
+Run
+```
+./Tab5.sh
+```
+Data (undecided region) to produce Table 5 is saved in `Tab5.log` in the root directory.
+
 ## Dependencies
 
 `PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)). In this prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
@@ -64,12 +164,6 @@ Or add all the packages at once.
 pkg> add IntervalArithmetic LazySets Polyhedra StaticArrays Symbolics CDDLib Match Plots ArgParse LaTeXStrings BenchmarkTools
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
-
-## Generating associated experimental results (figures and tables)
-
-The scripts `Fig<n>.sh` where `<n>` is in {3, 4, ..., 9} produce  `.png` files in order to construct the corresponding figures.
-
-The scripts `Tab<n>.sh` where `<n>` is in {3, 4, 5} produce `.log` reports in order to construct the corresponding tables.
 
 ## Quick start
 
