@@ -48,11 +48,11 @@ chmod +x Fig{3,4,5,6,7,8,9}.sh Tab{3,4,5}.sh
 > Note: The output figures are generated with `Luxor` when using the Doker image, while they where generated with `Plots` in the article. The results are the same, only the vizualisation differs. This choice was made due to technical reasons: it is possible to generate the exact output with the Julia files directly.
 
 <p align="center">
-    <img src="examples/ex_5-2_stability_controller_0.1_plots.png" height="300"> </br>
+    <img src="images/ex_5-2_stability_controller_0.1_plots.png" height="300"> </br>
     Figure 5 with Plots
 </p>
 <p align="center">
-    <img src="examples/ex_5-2_stability_controller_0.1_plots.png" height="300"> </br>
+    <img src="images/ex_5-2_stability_controller_0.1_luxor.png" height="300"> </br>
     Figure 5 with Luxor
 </p>
 

@@ -1,8 +1,9 @@
 build:
 	docker build -t globalqe .
 
-run:
-	docker run -v .:/app globalqe --with_luxor
+run_Fig5:
+	docker run -v .:/app globalqe examples/ex_5-2_stability_controller.jl 0.1 --with_luxor
+
 
 clean:
 	rm -f *.png *.log
