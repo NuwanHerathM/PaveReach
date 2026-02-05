@@ -16,7 +16,7 @@ include("pave.jl")
 inn, out, delta = paving11(...)
 ```
 
-For a quantified set $\Sigma$, the paving function `paving11` returns
+For a quantified set $\Sigma$, the paving function `paving_11` returns
 - the inside $\Sigma^-$ in  `inn`,
 - the outside $(\Sigma^\complement)^-$ in `out`,
 - and the potential boundary $\Sigma^\Delta$ in `delta`.
@@ -29,7 +29,7 @@ The scripts `Fig<n>.sh` where `<n>` is in {3, 4, ..., 9} produce  `.png` files i
 
 The scripts `Tab<n>.sh` where `<n>` is in {3, 4, 5} produce `.log` reports in order to construct the corresponding tables.
 
-> Note: Timings of our algorithm are obtained with the macro `@btime` from `BenchmarkTools`. The execution time might be long due to the number of samples that are taken into account. In the files `ex_5-...`, that number is set with the field `samples` at the end of the line starting with `@btime`. Feel free to set `samples=1` if you just wish to have a general idea of the timings. Otherwise, beware that running some of the following benchmarks may take some considerable time.
+> Note: Timings of our algorithm are obtained with the macro `@btime` from `BenchmarkTools`. The timings mentionned in the article reflect the call to the paving function (`pave_11` for example). Running an example includes the compilation in Julia, the construction of the problem, the paving which we time and the creation of an output. The execution time might be long due to the number of samples that are taken into account for the timing. In the files `ex_5-...`, that number is set with the field `samples` at the end of the line starting with `@btime`. Feel free to set `samples=1` if you just wish to have a general idea of the timings. Otherwise, beware that running some of the following benchmarks may take some considerable time.
 
 ### Building the Docker image
 
@@ -46,6 +46,15 @@ chmod +x Fig{3,4,5,6,7,8,9}.sh Tab{3,4,5}.sh
 ```
 
 > Note: The output figures are generated with `Luxor` when using the Doker image, while they where generated with `Plots` in the article. The results are the same, only the vizualisation differs. This choice was made due to technical reasons: it is possible to generate the exact output with the Julia files directly.
+
+<p align="center">
+    <img src="examples/ex_5-2_stability_controller_0.1_plots.png" height="300"> </br>
+    Figure 5 with Plots
+</p>
+<p align="center">
+    <img src="examples/ex_5-2_stability_controller_0.1_plots.png" height="300"> </br>
+    Figure 5 with Luxor
+</p>
 
 #### Figure 3
 
@@ -127,6 +136,26 @@ Run
 ```
 Data (undecided region) to produce Table 5 is saved in `Tab5.log` in the root directory.
 
+### Additional functionalities
+
+One can play with the choices of oracle, precision and paving improvement method for each example. Try getting the help message for the running example for instante:
+```
+docker run globalqe examples/ex_5-1_running_example.jl --help
+```
+In order to obtain the images, create a bind mount `-v /HOST-DIR:/CONTAINER-DIR`. We suggest `-v .:/app` (see in `Fig<n>.sh` for example). Try
+```
+docker run -v .:/app globalqe examples/ex_5-1_running_example.jl 2 2 0.5 --with_luxor
+```
+for $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$, $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$ and $\epsilon_{\mathbb{X}} = 0.5$. More details can be found [below](#explanation-for-a-1d-example-ex_5-1_running_examplejl).
+
+The different files are:
+* `ex_5-1_running_examples.jl`
+* `ex_5-1_running_examples_no_timing.jl` (does not call `BenchmarkTools`)
+* `ex_5-2_stability_controller.jl`
+* `ex_5-3_dubins.jl`
+* `ex_5-4_circle_collision.jl`
+* `ex_5-5_robot_collision.jl`
+
 ## Dependencies
 
 `PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)). In this prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
@@ -163,7 +192,7 @@ pkg>
 ```
 Add one package as follows.
 ```julia
-pkg> add <name_of_the_package>
+pkg> add <name_of_the_package> [@<version>]
 ```
 Or add all the packages at once.
 ```julia
@@ -259,14 +288,14 @@ run
 julia ex_5-1_running_example.jl 1 1 0.1 0.1 --subdivide
 ```
 
-The output can be saved with the option `--save`.
+The output can be saved with the option `--with_plots` or `--with_luxor`.
 To get more information, use
 ```
 julia ex_5-1_running_example.jl --help
 ```
 ```
-usage: ex_5-1_running_example.jl [-r] [-s] [--save] [-h] o_in o_out
-                        eps_x [eps_p]
+usage: ex_5-1_running_example.jl [-r] [-s] [--with_plots]
+                        [--with_luxor] [-h] o_in o_out eps_x [eps_p]
 
 positional arguments:
   o_in             oracle for IN (type: Int64)
@@ -280,7 +309,8 @@ optional arguments:
                    does not work with --subdivide
   -s, --subdivide  bisect the parameters with either ∀ or ∃, requires
                    eps_p, does not work with --refine
-  --save           save the output
+  --with_plots     generate the output with Plots.jl
+  --with_luxor     generate the output with Luxor.jl
   -h, --help       show this help message and exit
 ```
 
@@ -382,6 +412,8 @@ inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, true, false)
 
 ## Saving the output
 
+### With Plots
+
 ```julia
 p = plot()
 draw(p, X_0, inn, out, delta)
@@ -391,7 +423,7 @@ savefig(outfile)
 println("The result was saved in $(outfile).")
 ```
 
-## Displaying the output
+It is also possible to display the result.
 
 ```julia
 p = plot()
@@ -404,4 +436,17 @@ Run the script in interactive mode in order to keep the REPL open to visualize t
 
 ```
 julia -i ...
+```
+
+### With Luxor
+
+```julia
+width = 600
+height = 40
+buffer = 50
+outfile = ...
+Drawing(width + 2*buffer, height + 2*buffer, outfile)
+luxor_draw(X_0, inn, out, delta, width, height, buffer)
+finish()
+println("The result was saved in $(outfile).")
 ```
