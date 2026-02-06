@@ -131,7 +131,7 @@ println("ϵ_x = ", ϵ_x)
 println("ϵ_p = ", ϵ_p)
 
 @btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
-print_inn_out_delta(inn, out, delta)
+# print_inn_out_delta(inn, out, delta)
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 

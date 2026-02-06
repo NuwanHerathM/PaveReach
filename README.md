@@ -6,7 +6,7 @@ Paving of a set describing a quantified constraint problem, using general reacha
   <img src="images/ex_5-4_circle_collision_11_0.1_0.1_refined.png" width="300">
 </p>
 
-We refer here to sections, figures and tables of the article that uses this artifact.
+We refer here to sections, figures and tables of the paper that uses this artifact.
 
 ## Gist of the program
 
@@ -39,7 +39,7 @@ In our experiments, the pavings of Figure 3 were respectively computed
 
 In Table 3, this corresponds to the first three lines of the first column.
 
-> Note: Timings of our algorithm are obtained with the macro `@btime` from `BenchmarkTools`. The timings mentioned in the article reflect the call to the paving function (`pave_11` for example). Running an example includes the compilation in Julia, the construction of the problem, the paving which we time and the creation of an output. So the total execution time might be long. A certain number of samples that are taken into account for the timing by `@btime`. In the files `ex_5-...`, that number is set with the field `samples` at the end of the line starting with `@btime`. Feel free to set `samples=1` if you just wish to have a general idea of the timings. Otherwise, beware that running some of the following benchmarks may take some considerable time.
+> Note: Timings of our algorithm are obtained with the macro `@btime` from `BenchmarkTools`. The timings mentioned in the paper reflect the call to the paving function (`pave_11` for example). Running an example includes the compilation in Julia, the construction of the problem, the paving which we time and the creation of an output. So the total execution time might be long. The mean of certain number of samples are taken into account for the timing by `@btime`. In the files `ex_5-...`, that number is set with the field `samples` at the end of the line starting with `@btime`. Feel free to set `samples=1` if you just wish to have a general idea of the timings. Otherwise, beware that running some of the following benchmarks may take some considerable time.
 
 ### Requirement
 
@@ -54,7 +54,7 @@ make
 
 ### Running the experiments
 
-> Note: The output figures are generated with `Luxor` when using the Docker image, while they were generated with `Plots` in the article. The results are the same, only the visualization differs. This choice was made due to technical reasons: it is possible to generate the exact output figures with the Julia files directly.
+> Note: The output figures are generated with `Luxor` when using the Docker image, while they were generated with `Plots` in the paper. The results are the same, only the visualization differs. This choice was made due to technical reasons: it is possible to generate the exact output figures with the Julia files directly.
 
 <p align="center">
     <img src="images/ex_5-2_stability_controller_0.1_plots.png" height="300"> </br>
@@ -188,7 +188,7 @@ The different files are:
 ## Reusing the artifact
 ### Dependencies
 
-`PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)) from reference [10] in the article. In the present prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
+`PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)) from reference [10] in the paper. In the present prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
 
 #### List of the packages
 
@@ -235,7 +235,7 @@ Run (no command line argument, everything is hardcoded):
 ```
 julia ex_0-1_disk.jl
 ```
-<!-- It should return:
+It should return:
 ```
 ϵ_x  = 0.1
 ϵ_p  = 0.5
@@ -243,16 +243,16 @@ Not refined
 Normal bisection on P
 Undecided domain: 2.6 %
 The result was saved in ex_0-1_disk_11_0.1_0.5_subdivided.png.
-``` -->
+```
 You will find the output in a file named `ex_0-1_disk_11_0.1_0.5_subdivided.png`.
 
-#### Try the running example from the article (Section 5.1)
+#### Try the running example from the paper (Section 5.1)
 
 Run
 ```
 julia ex_5-1_running_example.jl 1 1 0.1 --with_plots
 ```
-<!-- It should return (with the execution time instead of `<time>`):
+It should return (with the execution time instead of `<time>`):
 ```
 O^IN_1, O^OUT_1
 ϵ_x  = 0.1
@@ -262,7 +262,7 @@ No standard bisection on P
   <time> ms (19787 allocations: 712.52 KiB)
 Undecided domain: 18.8 %
 The result was saved in ex_5-1_running_example_11_0.1.png.
-``` -->
+```
 You will find the output in a file named `ex_5-1_running_example_11_0.1.png`.
 
 ### What the examples do
@@ -280,7 +280,7 @@ $$\{ x \in [-5, 5] \times [-5, 5] \, | \, \exists z \in [0, 16], f(x, z) = x_1^2
 - Paving precision: $\epsilon_{\mathbb{X}} = 0.1$
 - Parameter subdivision precision: $\epsilon_{\mathbb{P}} = 0.5$
 
-<!-- Check the detailed explanation of the script [here](README_ex_0-1_disk.md). -->
+Check the detailed explanation of the script [here](README_ex_0-1_disk.md).
 
 #### Explanation for a 1D example (`ex_5-1_running_example.jl`)
 
@@ -291,7 +291,7 @@ $$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], f(x, p_1) = p_1^2 - (x - 1)
 - Parameters and quantifiers: $\forall p_1 \in [0, 1/4]$
 - Target: $\mathbb{G} = [-1/4, 1/4]$
 
-<!-- Check the detailed explanation of the script [here](README_ex_5-1_running_example.md). -->
+Check the detailed explanation of the script [here](README_ex_5-1_running_example.md).
 
 In order to pave with 
 - $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$,
@@ -320,7 +320,7 @@ To get more information, use
 ```
 julia ex_5-1_running_example.jl --help
 ```
-<!-- ```
+```
 usage: ex_5-1_running_example.jl [-r] [-s] [--with_plots]
                         [--with_luxor] [-h] o_in o_out eps_x [eps_p]
 
@@ -339,7 +339,7 @@ optional arguments:
   --with_plots     generate the output with Plots.jl
   --with_luxor     generate the output with Luxor.jl
   -h, --help       show this help message and exit
-``` -->
+```
 
 ### Quantified constraint problem
 
@@ -420,7 +420,7 @@ Select one of the four paving functions according to this table
 
 > Note: the user does not have to construct $\neg\mathbb{P}$ or $\mathbb{G}^\complement$. The four paving functions take $\mathbb{P}$ and $\mathbb{G}$ as input, so swapping between the functions amounts only to changing the name of the function.
 
-<!-- ## Parameter subdivision
+## Parameter subdivision
 
 No parameter subdivision:
 ```julia
@@ -433,7 +433,7 @@ inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, false, true)
 Points/subdivision as in Section 4.2:
 ```julia
 inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, true, false)
-``` -->
+```
 
 ## Saving the output
 
