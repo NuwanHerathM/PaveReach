@@ -12,7 +12,7 @@ COPY /examples/ex_5-4_circle_collision.jl /app/examples/ex_5-4_circle_collision.
 COPY /examples/ex_5-5_robot_collision.jl /app/examples/ex_5-5_robot_collision.jl
 
 # Add Julia packages
-RUN julia -e 'using Pkg; Pkg.add(name="ArgParse", version="1.2.0"); Pkg.add(name="IntervalArithmetic", version="0.21.2"); Pkg.add(name="LazySets", version="2.14.2"); Pkg.add(name="Polyhedra", version="0.8.1"); Pkg.add(name="StaticArrays", version="1.9.16"); Pkg.add(name="Symbolics", version="6.31.0"); Pkg.add(name="CDDLib", version="0.10.2"); Pkg.add(name="Match", version="2.4.1"); Pkg.add(name="Plots", version="1.41.5"); Pkg.add(name="ArgParse", version="1.2.0"); Pkg.add(name="LaTeXStrings", version="1.4.0"); Pkg.add(name="BenchmarkTools", version="1.6.3"); Pkg.add(name="Luxor", version="4.3.0"); Pkg.add(name="MathTeXEngine", version="0.6.7");'
+RUN julia -e 'using Pkg; Pkg.add(name="ArgParse", version="1.2.0"); Pkg.add(name="IntervalArithmetic", version="0.21.2"); Pkg.add(name="LazySets", version="2.14.2"); Pkg.add(name="Symbolics", version="6.31.0"); Pkg.add(name="Match", version="2.4.1"); Pkg.add(name="Plots", version="1.41.5"); Pkg.add(name="LaTeXStrings", version="1.4.0"); Pkg.add(name="BenchmarkTools", version="1.6.3"); Pkg.add(name="Luxor", version="4.3.0"); Pkg.add(name="MathTeXEngine", version="0.6.7");'
 
 # Run the script with arguments
 ENTRYPOINT ["julia"]

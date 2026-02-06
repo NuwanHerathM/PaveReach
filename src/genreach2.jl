@@ -1,9 +1,6 @@
 using IntervalArithmetic
 using Symbolics 
 using LazySets
-using Polyhedra
-using StaticArrays
-using CDDLib
 
 function print_QE(QE)
   print("Computing approximations for R={z | ")

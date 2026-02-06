@@ -13,7 +13,7 @@ We refer here to sections, figures and tables of the article that uses this arti
 ```julia
 include("pave.jl")
 ...
-inn, out, delta = paving11(...)
+inn, out, delta = paving_11(...)
 ```
 
 For a quantified set $\Sigma$, the paving function `paving_11` returns
@@ -29,23 +29,32 @@ The scripts `Fig<n>.sh` where `<n>` is in {3, 4, ..., 9} produce  `.png` files i
 
 The scripts `Tab<n>.sh` where `<n>` is in {3, 4, 5} produce `.log` reports in order to construct the corresponding tables.
 
-> Note: Timings of our algorithm are obtained with the macro `@btime` from `BenchmarkTools`. The timings mentionned in the article reflect the call to the paving function (`pave_11` for example). Running an example includes the compilation in Julia, the construction of the problem, the paving which we time and the creation of an output. The execution time might be long due to the number of samples that are taken into account for the timing. In the files `ex_5-...`, that number is set with the field `samples` at the end of the line starting with `@btime`. Feel free to set `samples=1` if you just wish to have a general idea of the timings. Otherwise, beware that running some of the following benchmarks may take some considerable time.
+> Note: In the paper, timings were computed on a 12th
+Gen Intel(R) Core(TM) i7-12700H processor with a clock rate of
+3.50 GHz and a 16 Gio RAM. They ran on a Dell Inc. Precision 3571 using Ubuntu 24.04.3 LTS. There may be great disparities with other platforms.
+
+In our experiments, the pavings of Figure 3 were respectively computed
+* in 1 ms, 3 ms and 21 ms on the Ubuntu machine and
+* in 430 ms, 1 s and 8 s on a macOS machine.
+
+In Table 3, this corresponds to the first three lines of the first column.
+
+> Note: Timings of our algorithm are obtained with the macro `@btime` from `BenchmarkTools`. The timings mentioned in the article reflect the call to the paving function (`pave_11` for example). Running an example includes the compilation in Julia, the construction of the problem, the paving which we time and the creation of an output. So the total execution time might be long. A certain number of samples that are taken into account for the timing by `@btime`. In the files `ex_5-...`, that number is set with the field `samples` at the end of the line starting with `@btime`. Feel free to set `samples=1` if you just wish to have a general idea of the timings. Otherwise, beware that running some of the following benchmarks may take some considerable time.
+
+### Requirement
+
+Make sure that you have [Docker](https://docs.docker.com/get-started/) installed and running.
 
 ### Building the Docker image
 
-Get in the root directory, where you can find the `Dockerfile` file. Build the image that we will name `globalqe`:
+Get in the root directory, where you can find the `Dockerfile` and `Makefile` files. Run the `make` command in order to build the image that we will name `globalqe` and change the mode of the scripts to execute.
 ```
-docker build -t globalqe .
+make
 ```
 
 ### Running the experiments
 
-Change the mode of the scripts to execute:
-```
-chmod +x Fig{3,4,5,6,7,8,9}.sh Tab{3,4,5}.sh
-```
-
-> Note: The output figures are generated with `Luxor` when using the Doker image, while they where generated with `Plots` in the article. The results are the same, only the vizualisation differs. This choice was made due to technical reasons: it is possible to generate the exact output with the Julia files directly.
+> Note: The output figures are generated with `Luxor` when using the Docker image, while they were generated with `Plots` in the article. The results are the same, only the visualization differs. This choice was made due to technical reasons: it is possible to generate the exact output figures with the Julia files directly.
 
 <p align="center">
     <img src="images/ex_5-2_stability_controller_0.1_plots.png" height="300"> </br>
@@ -58,6 +67,8 @@ chmod +x Fig{3,4,5,6,7,8,9}.sh Tab{3,4,5}.sh
 
 #### Figure 3
 
+Paving of the running example (Section 5.1) by Algorithm 1 for $\epsilon_\mathbb{X} = 0.1$, $\epsilon_\mathbb{X} = 0.01$ and $\epsilon_\mathbb{X} = 0.001$.
+
 Run
 ```
 ./Fig3.sh
@@ -65,6 +76,8 @@ Run
 `ex_5-1_running_example_11_0.1.png` ($\epsilon_\mathbb{X} = 0.1$), `ex_5-1_running_example_11_0.01.png` ($\epsilon_\mathbb{X} = 0.01$) and `ex_5-1_running_example_11_0.001.png` ($\epsilon_\mathbb{X} = 0.001$) appear in `examples/`.
 
 #### Figure 4
+
+Paving of the running example (Section 5.1) for $\epsilon_\mathbb{X} = \epsilon_\mathbb{P} = 0.001$ with the different oracles.
 
 Run
 ```
@@ -74,6 +87,8 @@ Run
 
 #### Figure 5
 
+Paving of GarloffGraf1 (Section 5.2) for $\epsilon_\mathbb{X} = 0.1$.
+
 Run
 ```
 ./Fig5.sh
@@ -82,13 +97,17 @@ Run
 
 #### Figure 6
 
+Paving of the Dubins example (Section 5.3) with $\epsilon_\mathbb{X} = \epsilon_\mathbb{P} = 0.01$.
+
 Run
 ```
 ./Fig6.sh
 ```
-`ex_5-3_dubins_0.01_nothing_x.png` ($x$), `ex_5-3_dubins_0.01_nothing_y.png` ($y$) and `ex_5-3_dubins_0.01_nothing_theta.png` ($\theta$) appears in `examples/`.
+`ex_5-3_dubins_0.01_nothing_x.png` ($x$), `ex_5-3_dubins_0.01_nothing_y.png` ($y$) and `ex_5-3_dubins_0.01_nothing_theta.png` ($\theta$) appear in `examples/`.
 
 #### Figure 7
+
+Paving of the circle collision problem (Section 5.4) with $\epsilon_\mathbb{X} = \epsilon_\mathbb{P} = 0.1$, using Lemma 4.4 and Lemma 4.5.
 
 Run
 ```
@@ -98,6 +117,8 @@ Run
 
 #### Figure 8
 
+Paving of the robot collision problem (Section 5.5) with $\epsilon_\mathbb{X} = \epsilon_\mathbb{P} = 0.01$, using Lemma 4.4 and Lemma 4.5.
+
 Run
 ```
 ./Fig8.sh
@@ -105,6 +126,8 @@ Run
 `ex_5-5_robot_collision_0.01_0.01_refined.png` appears in `examples/`.
 
 #### Figure 9
+
+Paving of the robot collision problem (Section 5.5) with $\epsilon_\mathbb{X} = \epsilon_\mathbb{P} = 0.1$ using Lemmas 3.1 and 3.2, 4.2 and 4.3, and 4.4 and 4.5.
 
 Run
 ```
@@ -114,6 +137,8 @@ Run
 
 #### Table 3
 
+Proportion of undecided domain and timings for the running example (Section 5.1), with and without parameter subdivision.
+
 Run
 ```
 ./Tab3.sh
@@ -121,6 +146,8 @@ Run
 Data (undecided region and timing) to produce Table 3 is saved in `Tab3.log` in the root directory.
 
 #### Table 4
+
+Proportion of the undecided domain for the running example (Section 5.1) using Lemma 4.2 and Lemma 4.3.
 
 Run
 ```
@@ -130,6 +157,8 @@ Data (undecided region) to produce Table 4 is saved in `Tab4.log` in the root di
 
 #### Table 5
 
+Proportion of the undecided domain for the running example (Section 5.1) using Lemma 4.4 and Lemma 4.5.
+
 Run
 ```
 ./Tab5.sh
@@ -138,11 +167,11 @@ Data (undecided region) to produce Table 5 is saved in `Tab5.log` in the root di
 
 ### Additional functionalities
 
-One can play with the choices of oracle, precision and paving improvement method for each example. Try getting the help message for the running example for instante:
+One can play with the choices of oracle, precision and paving improvement method for each example. Try getting the help message for the running example for instance:
 ```
 docker run globalqe examples/ex_5-1_running_example.jl --help
 ```
-In order to obtain the images, create a bind mount `-v /HOST-DIR:/CONTAINER-DIR`. We suggest `-v .:/app` (see in `Fig<n>.sh` for example). Try
+In order to obtain the images, create a bind mount `-v /HOST-DIR:/CONTAINER-DIR`. We suggest `-v .:/app` (see how it is done in `Fig3.sh` for example). Try
 ```
 docker run -v .:/app globalqe examples/ex_5-1_running_example.jl 2 2 0.5 --with_luxor
 ```
@@ -156,19 +185,17 @@ The different files are:
 * `ex_5-4_circle_collision.jl`
 * `ex_5-5_robot_collision.jl`
 
-## Dependencies
+## Reusing the artifact
+### Dependencies
 
-`PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)). In this prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
+`PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)) from reference [10] in the article. In the present prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
 
-### List of the packages
+#### List of the packages
 
 For `GenReach`
 * `IntervalArithmetic` v0.21.2
 * `LazySets` v2.14.2
-* `Polyhedra` v0.8.1
-* `StaticArrays` v1.9.16
 * `Symbolics` v6.31.0
-* `CDDLib` v0.10.2
 
 For `PaveReach`
 * `Match` v2.4.1
@@ -179,7 +206,7 @@ For `PaveReach`
 * `Luxor` v4.3.0
 * `MathTeXEngine` v0.6.7
 
-### Adding a package
+#### Adding a package
 
 Call `julia` to get in the interactive REPL.
 You will get to the `julia>` prompt.
@@ -200,15 +227,15 @@ pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArra
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
 
-## Quick start
+### Quick start
 
-### Try a 2D toy example
+#### Try a 2D toy example
 
 Run (no command line argument, everything is hardcoded):
 ```
 julia ex_0-1_disk.jl
 ```
-It should return:
+<!-- It should return:
 ```
 ϵ_x  = 0.1
 ϵ_p  = 0.5
@@ -216,16 +243,16 @@ Not refined
 Normal bisection on P
 Undecided domain: 2.6 %
 The result was saved in ex_0-1_disk_11_0.1_0.5_subdivided.png.
-```
+``` -->
 You will find the output in a file named `ex_0-1_disk_11_0.1_0.5_subdivided.png`.
 
-### Try the running example from the article (Section 5.1)
+#### Try the running example from the article (Section 5.1)
 
 Run
 ```
 julia ex_5-1_running_example.jl 1 1 0.1 --with_plots
 ```
-It should return (with the execution time instead of `<time>`):
+<!-- It should return (with the execution time instead of `<time>`):
 ```
 O^IN_1, O^OUT_1
 ϵ_x  = 0.1
@@ -235,12 +262,12 @@ No standard bisection on P
   <time> ms (19787 allocations: 712.52 KiB)
 Undecided domain: 18.8 %
 The result was saved in ex_5-1_running_example_11_0.1.png.
-```
+``` -->
 You will find the output in a file named `ex_5-1_running_example_11_0.1.png`.
 
-## What the examples do
+### What the examples do
 
-### Explanation for a 2D example (`ex_0-1_disk.jl`)
+#### Explanation for a 2D example (`ex_0-1_disk.jl`)
 
 > Note: the example is degenerated, there is no parameter $\mathbb{P}$.
 
@@ -253,18 +280,18 @@ $$\{ x \in [-5, 5] \times [-5, 5] \, | \, \exists z \in [0, 16], f(x, z) = x_1^2
 - Paving precision: $\epsilon_{\mathbb{X}} = 0.1$
 - Parameter subdivision precision: $\epsilon_{\mathbb{P}} = 0.5$
 
-Check the detailed explanation of the script [here](README_ex_0-1_disk.md).
+<!-- Check the detailed explanation of the script [here](README_ex_0-1_disk.md). -->
 
-### Explanation for a 1D example (`ex_5-1_running_example.jl`)
+#### Explanation for a 1D example (`ex_5-1_running_example.jl`)
 
 The example in `ex_5-1_running_example.jl` sets up the scalar problem:
 $$\{ x \in [-5, 5] \, | \, \forall p_1 \in [0, 1/4], f(x, p_1) = p_1^2 - (x - 1)(x - 2)(x - 3) \in [-1/4, 1/4] \}.$$
 
 - Domain for $x$: $X_0 = [-5, 5]$
-- Parameters and quantifiers: $∀ p_1 ∈ [0, 1/4]$
+- Parameters and quantifiers: $\forall p_1 \in [0, 1/4]$
 - Target: $\mathbb{G} = [-1/4, 1/4]$
 
-Check the detailed explanation of the script [here](README_ex_5-1_running_example.md).
+<!-- Check the detailed explanation of the script [here](README_ex_5-1_running_example.md). -->
 
 In order to pave with 
 - $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$,
@@ -293,7 +320,7 @@ To get more information, use
 ```
 julia ex_5-1_running_example.jl --help
 ```
-```
+<!-- ```
 usage: ex_5-1_running_example.jl [-r] [-s] [--with_plots]
                         [--with_luxor] [-h] o_in o_out eps_x [eps_p]
 
@@ -312,11 +339,11 @@ optional arguments:
   --with_plots     generate the output with Plots.jl
   --with_luxor     generate the output with Luxor.jl
   -h, --help       show this help message and exit
-```
+``` -->
 
-## Quantified constraint problem
+### Quantified constraint problem
 
-### General case
+#### General case
 
 The `QuantifiedConstraintProblem` type aggregates the information needed to compute the reachability with `GenReach`.
 ```julia
@@ -334,7 +361,7 @@ qcp = QuantifiedConstraintProblem(problem, qvs, [qvs_relaxed_1, qvs_relaxed_2], 
 ```
 See the examples for further details.
 
-### For a scalar-valued function
+#### For a scalar-valued function
 
 For scalar-valued functions, one simply needs to do
 ```julia
@@ -345,7 +372,7 @@ qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
 ```
 In this case, `qvs` is just repeated between `[` and `]`.
 
-### `Problem`
+#### `Problem`
 
 A `Problem` is constructed from a function `f_fun` and the function which computes its Jacobian `Df_fun`.
 ```julia
@@ -361,13 +388,11 @@ f_num = [...]
 f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
 ```
 
-### Quantified variables
+#### Quantified variables
 
-A quantified variable is the tuple made of a quantifier (`Forall` or `Exists`) and an integer.
+A quantified variable is the tuple made of a quantifier (`Forall` or `Exists`) and an integer. For example, $\forall x_1$ and $\exists x_5$ are represented by
 ```julia 
-# ∀ x_1
 qv_1 = (Forall, 1)
-# ∃ x_5
 qv_2 = (Exists, 5)
 ```
 
@@ -384,18 +409,18 @@ qvs = [(Forall, 3)]
 
 The first two variables correspond to the free variables, $x$ and $y$, of the 2D problem and the last one is $d \in \mathbb{G}$ (`n=1`). Their quantifiers are handled by the algorithm.
 
-## Oracles
+### Oracles
 
 Select one of the four paving functions according to this table
 
 |   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $\mathbb{G}$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$
 |---|---|---
-| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$                  | `pave11` | `pave12`
-| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$ | `pave21` | `pave22`
+| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$                  | `pave_11` | `pave_12`
+| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$ | `pave_21` | `pave_22`
 
 > Note: the user does not have to construct $\neg\mathbb{P}$ or $\mathbb{G}^\complement$. The four paving functions take $\mathbb{P}$ and $\mathbb{G}$ as input, so swapping between the functions amounts only to changing the name of the function.
 
-## Parameter subdivision
+<!-- ## Parameter subdivision
 
 No parameter subdivision:
 ```julia
@@ -408,7 +433,7 @@ inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, false, true)
 Points/subdivision as in Section 4.2:
 ```julia
 inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, true, false)
-```
+``` -->
 
 ## Saving the output
 

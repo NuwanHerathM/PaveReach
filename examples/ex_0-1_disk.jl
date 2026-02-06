@@ -41,9 +41,9 @@ p_in = []
 p_out = deepcopy(p_in)
 G = [interval(0, 16)]
 
-ϵ_x = 1
+ϵ_x = 0.1
 ϵ_p = 0.5
-allow_exists_or_forall_bisection = false
+allow_exists_or_forall_bisection = true
 allow_exists_and_forall_bisection = false
 
 @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
