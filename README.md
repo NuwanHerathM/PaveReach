@@ -83,7 +83,7 @@ Run
 ```
 ./Fig4.sh
 ```
-`ex_5-1_running_example_11_0.001.png` (Lemmas 3.1 and 3.2), `ex_5-1_running_example_11_0.001_subdivided.png` (Lemmas 4.2 and 4.3) and `ex_5-1_running_example_11_0.001_refined.png` (Lemmas 4.4 and 4.5) appear in `examples/`.
+`ex_5-1_running_example_11_0.001.png` (Lemmas 3.1 and 3.2), `ex_5-1_running_example_11_0.001_0.001_subdivided.png` (Lemmas 4.2 and 4.3) and `ex_5-1_running_example_11_0.001_0.001_refined.png` (Lemmas 4.4 and 4.5) appear in `examples/`.
 
 #### Figure 5
 
@@ -302,7 +302,7 @@ run
 ```
 julia ex_5-1_running_example.jl 1 1 0.1
 ```
-The first two arguments, `1` and `1`, select the paving function `pave11`. See [Oracles](#oracles). The third argument, `0.1` corresponds to $\epsilon_\mathbb{X}$.
+The first two arguments, `1` and `1`, select the paving function `pave_11`. See [Oracles](#oracles). The third argument, `0.1` corresponds to $\epsilon_\mathbb{X}$.
 
 In order to pave with subdivision as in Section 4.1,
 - $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$,
