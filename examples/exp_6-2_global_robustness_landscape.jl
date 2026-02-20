@@ -1,6 +1,6 @@
-include("utils.jl")
-include("pave.jl")
-include("read_onnx.jl")
+include("../src/utils.jl")
+include("../src/pave.jl")
+include("../src/read_onnx.jl")
 
 using BenchmarkTools
 
@@ -15,14 +15,14 @@ function parse_commandline()
             help = "confidence delta"
             arg_type = Float64
             required = true
-        "eps_x"
-            help = "epsilon for the paving"
-            arg_type = Float64
-            required = true
-        "eps_p"
-            help = "epsilon for the parameters"
-            arg_type = Float64
-            required = false
+        # "eps_x"
+        #     help = "epsilon for the paving"
+        #     arg_type = Float64
+        #     required = true
+        # "eps_p"
+        #     help = "epsilon for the parameters"
+        #     arg_type = Float64
+        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
@@ -41,8 +41,10 @@ parsed_args = parse_commandline()
 # ------------------------------------------------------
 δ = parsed_args["delta"]
 
-ϵ_x = parsed_args["eps_x"]
-ϵ_p = parsed_args["eps_p"]
+# ϵ_x = parsed_args["eps_x"]
+# ϵ_p = parsed_args["eps_p"]
+ϵ_x = [0.01]
+ϵ_p = nothing
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
 
@@ -77,14 +79,14 @@ function perturbation(x)
 end
 
 function gradient_perturbation(x)
-    return [1 1]
+    return [1 1; 0 0; 0 0]
 end
 
 n = 2
 p = 4
 f_fun = [x -> (confidence(N([x[1], x_h, x_r])) - x[3]), x -> (confidence(N(perturbation(x[1:2]))) - x[4])]
 Df_fun = [x -> [confidence(DN(IntervalBox([x[1], x_h, x_r])) * gradient_variables)... 0 -1 0],
-        x -> [confidence(DN(IntervalBox(perturbation(x[1:2]))) * gradient_variables * gradient_perturbation(x[1:2]))... 0 -1]]
+        x -> [confidence(DN(IntervalBox(perturbation(x[1:2]))) * gradient_perturbation(x[1:2]))... 0 -1]]
 
 problem = Problem(f_fun, Df_fun, [[1], [2]])
 qvs = [(Forall, 2)]
@@ -92,9 +94,10 @@ qcp = QuantifiedConstraintProblem(problem, qvs, [qvs, qvs], p, n)
 X_0 = IntervalBox(interval(25/149, 1))
 p_in = [[interval(-2/149, 2/149)]]
 p_out = deepcopy(p_in)
-G = [interval(minus_inf, δ - 0.0001), interval(0.0001, plus_inf)]
+G = [interval(minus_inf, δ - strict_epsilon), interval(strict_epsilon, plus_inf)]
 
-@btime(global inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
+# @btime(global inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
+inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
 
 if parsed_args["save"]
     p = plot()

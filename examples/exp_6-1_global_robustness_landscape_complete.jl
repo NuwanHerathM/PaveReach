@@ -1,6 +1,7 @@
-include("utils.jl")
-include("pave.jl")
-include("read_onnx.jl")
+include("../src/utils.jl")
+include("../src/pave.jl")
+
+using BenchmarkTools
 
 # ------------------------------------------------------
 using ArgParse
@@ -13,14 +14,14 @@ function parse_commandline()
             help = "confidence delta"
             arg_type = Float64
             required = true
-        "eps_x"
-            help = "epsilon for the paving"
-            arg_type = Float64
-            required = true
-        "eps_p"
-            help = "epsilon for the parameters"
-            arg_type = Float64
-            required = false
+        # "eps_x"
+        #     help = "epsilon for the paving"
+        #     arg_type = Float64
+        #     required = true
+        # "eps_p"
+        #     help = "epsilon for the parameters"
+        #     arg_type = Float64
+        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
@@ -39,11 +40,12 @@ parsed_args = parse_commandline()
 # ------------------------------------------------------
 δ = parsed_args["delta"]
 
-ϵ_x = parsed_args["eps_x"]
-ϵ_p = parsed_args["eps_p"]
+# ϵ_x = parsed_args["eps_x"]
+# ϵ_p = parsed_args["eps_p"]
+ϵ_x = [0.05, 0.05]
+ϵ_p = nothing
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
-
 
 if isnothing(ϵ_p)
     @assert !allow_exists_and_forall_bisection "eps_p was not provided. Refinement requires eps_p. Use --help for more information."
@@ -58,30 +60,46 @@ end
 
 filename = splitext(PROGRAM_FILE)[1]
 
-nnet = read_onnx_mlp("normed_etcs_2x250_nodes.onnx")
+nnet = read_nnet("running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 
-confidence(vect::AbstractVector) = vect[1] - vect[2]
-confidence(mat::Matrix) = mat[1, :] - mat[2, :]
+confidence_1(vect::AbstractVector) = vect[1] - vect[2]
+confidence_1(mat::Matrix) = mat[1, :] - mat[2, :]
+confidence_2(vect::AbstractVector) = vect[2] - vect[1]
+confidence_2(mat::Matrix) = mat[2, :] - mat[1, :]
 
-gradient_variables = [1 0; 0 1; 0 0]
+function perturbation(x)
+    return [x[1] + x[3], x[2] + x[4]]
+end
 
-x_r = 1
+function gradient_perturbation(x)
+    return [1 0 1 0; 0 1 0 1]
+end
 
-n = 1
-p = 3
-f_fun = [x -> (confidence(N([x[1], x[2], x_r])) - x[3])]
-Df_fun = [x -> [confidence(DN(IntervalBox([x[1], x[2], x_r])) * gradient_variables)... -1]]
-problem = Problem(f_fun, Df_fun, [[1]])
-qvs = []
-qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
-X_0 = IntervalBox(interval(0, 1), interval(0, 1))
-p_in = []
+n = 4
+p = 8
+f_fun = [x -> (confidence_1(N(x[1:2])) - x[5]), x -> (confidence_1(N(perturbation(x[1:4]))) - x[6]),
+        x -> (confidence_2(N(x[1:2])) - x[7]), x -> (confidence_2(N(perturbation(x[1:4]))) - x[8])]
+Df_fun = [x -> [confidence_1(DN(x[1:2]))... 0 0 -1 0 0 0],
+        x -> [confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))... 0 -1 0 0],
+        x -> [confidence_2(DN(x[1:2]))... 0 0 0 0 -1 0],
+        x -> [confidence_2(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))... 0 0 0 -1]]
+problem = Problem(f_fun, Df_fun, [[1, 3], [1, 4], [2, 3], [2, 4]])
+qvs = [(Forall, 3), (Forall, 4)]
+qcp = QuantifiedConstraintProblem(problem, qvs, [qvs, qvs, qvs, qvs], p, n)
+X_0 = IntervalBox(interval(-1, 1), interval(-1, 1))
+ϵ_max = 1/8
+p_in = [[interval(-ϵ_max, ϵ_max)], [interval(-ϵ_max, ϵ_max)]]
 p_out = deepcopy(p_in)
-G = [interval(δ, plus_inf)]
+G = [interval(minus_inf, δ - strict_epsilon), interval(strict_epsilon, plus_inf), interval(minus_inf, δ - strict_epsilon), interval(strict_epsilon, plus_inf)]
 
-inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+using TimerOutputs
+const to = TimerOutput()
+
+@timeit to "pave" inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+
+show(to)
 
 if parsed_args["save"]
     p = plot()

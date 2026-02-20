@@ -9,6 +9,7 @@ include("quantifiedconstraintproblem.jl")
 
 const global minus_inf = -100000
 const global plus_inf = 100000
+const global strict_epsilon = 0.0001
 
 # Paving
 
@@ -118,13 +119,13 @@ end
 
 increment!(indices, lengths, pos) = increment!(indices, lengths, pos, 0)
 
-function complement(x::IntervalArithmetic.Interval; ϵ=0.0001)
+function complement(x::IntervalArithmetic.Interval)
     l = []
     if x.lo != minus_inf
-        push!(l, interval(minus_inf, x.lo - ϵ))
+        push!(l, interval(minus_inf, x.lo - strict_epsilon))
     end
     if x.hi != plus_inf
-        push!(l, interval(x.hi + ϵ, plus_inf))
+        push!(l, interval(x.hi + strict_epsilon, plus_inf))
     end
     return l
 end
@@ -246,7 +247,7 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
     end
 end
 
-function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}}, ϵ::Float64=0.0001)::Function where {T<:Number}
+function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Forall, i) for i in 1:length(X)]..., negation.(qcp.qvs)..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -326,7 +327,7 @@ function check_is_out(X_0, p_out, G, qcp, criterion)
                 is_out = create_is_out_1(qcp, sub_interval)
             end
             if criterion == 2
-                is_out = create_is_out_2(qcp, sub_interval, 0.00001)
+                is_out = create_is_out_2(qcp, sub_interval)
             end
             is_out_union |= is_out(X_0)
             increment!(indices, lengths, indices_forall)

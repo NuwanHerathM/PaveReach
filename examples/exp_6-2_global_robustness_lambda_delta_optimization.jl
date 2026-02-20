@@ -1,5 +1,6 @@
-include("utils.jl")
-include("pave.jl")
+include("../src/utils.jl")
+include("../src/pave.jl")
+include("../src/read_onnx.jl")
 
 using BenchmarkTools
 
@@ -10,18 +11,6 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table s begin
-        "delta"
-            help = "confidence delta"
-            arg_type = Float64
-            required = true
-        # "eps_x"
-        #     help = "epsilon for the paving"
-        #     arg_type = Float64
-        #     required = true
-        # "eps_p"
-        #     help = "epsilon for the parameters"
-        #     arg_type = Float64
-        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
@@ -38,15 +27,10 @@ end
 
 parsed_args = parse_commandline()
 # ------------------------------------------------------
-δ = parsed_args["delta"]
-
-# ϵ_x = parsed_args["eps_x"]
-# ϵ_p = parsed_args["eps_p"]
-ϵ_x = [0.05, 0.05]
-ϵ_p = nothing
+ϵ_x = [0.1, 0.1]
+ϵ_p = [0.01, 1]
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
-
 
 if isnothing(ϵ_p)
     @assert !allow_exists_and_forall_bisection "eps_p was not provided. Refinement requires eps_p. Use --help for more information."
@@ -61,26 +45,50 @@ end
 
 filename = splitext(PROGRAM_FILE)[1]
 
-nnet = read_nnet("running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
+nnet = read_onnx_mlp("normed_etcs_2x250_nodes.onnx")
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 
 confidence(vect::AbstractVector) = vect[1] - vect[2]
 confidence(mat::Matrix) = mat[1, :] - mat[2, :]
 
-n = 1
-p = 3
-f_fun = [x -> (confidence(N(x[1:2])) - x[3])]
-Df_fun = [x -> [confidence(DN(x[1:2]))... -1]]
-problem = Problem(f_fun, Df_fun, [[1]])
-qvs = []
-qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
-X_0 = IntervalBox(interval(-1, 1), interval(-1, 1))
-p_in = []
-p_out = deepcopy(p_in)
-G = [interval(δ + 0.0001, plus_inf)]
+gradient_variables = [1; 0; 0]
 
-inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+x_h = 20/50
+x_r = 35/50
+
+function perturbation(x)
+    return [x[3] + x[4] * x[1], x_h, x_r]
+end
+
+function gradient_perturbation(x)
+    return [x[4] 0 1 x[1]; 0 0 0 0; 0 0 0 0]
+end
+
+n = 2
+p = 6
+f_fun = [x -> (confidence(N([x[3], x_h, x_r])) - x[2] - x[5]), x -> (confidence(N(perturbation(x[1:4]))) - x[6])]
+Df_fun = [x -> [0 -1 confidence(DN(IntervalBox([x[3], x_h, x_r])) * gradient_variables)... 0 -1 0],
+        x -> [confidence(DN(IntervalBox(perturbation(x[1:4]))) * gradient_perturbation(x[1:4]))... 0 -1]]
+problem = Problem(f_fun, Df_fun, [[1], [2]])
+qvs = [(Forall, 3), (Forall, 4)]
+qcp = QuantifiedConstraintProblem(problem, qvs, [qvs, qvs], p, n)
+X_0 = IntervalBox(interval(0, 1), interval(0, 1))
+p_in = [[interval(100/149, 1)], [interval(-0.013, 0.013)]]
+p_out = deepcopy(p_in)
+G = [interval(minus_inf, -strict_epsilon), interval(strict_epsilon, plus_inf)]
+
+if allow_exists_and_forall_bisection
+    refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+    refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+end
+
+using TimerOutputs
+const to = TimerOutput()
+
+@timeit to "pave" inn, out, delta = pave_monotonous_12(X_0, [1, -1], p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+
+show(to)
 
 if parsed_args["save"]
     p = plot()
@@ -89,11 +97,11 @@ if parsed_args["save"]
     plot(p)
 
     if allow_exists_and_forall_bisection
-        outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_refined.png"
+        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_refined.png"
     elseif allow_exists_or_forall_bisection
-        outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
+        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
     else
-        outfile = "$(filename)_$(δ)_$(ϵ_x).png"
+        outfile = "$(filename)_$(ϵ_x).png"
     end
     savefig(outfile)
     println("The result was saved in $(outfile).")

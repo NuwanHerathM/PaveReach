@@ -1,7 +1,7 @@
-include("pave.jl")
+include("../src/utils.jl")
+include("../src/pave.jl")
+include("../src/read_onnx.jl")
 
-using Plots.PlotMeasures
-using LaTeXStrings
 using BenchmarkTools
 
 # ------------------------------------------------------
@@ -11,14 +11,6 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table s begin
-        "eps_x"
-            help = "epsilon for the paving"
-            arg_type = Float64
-            required = true
-        "eps_p"
-            help = "epsilon for the parameters"
-            arg_type = Float64
-            required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
@@ -35,11 +27,10 @@ end
 
 parsed_args = parse_commandline()
 # ------------------------------------------------------
-ϵ_x = parsed_args["eps_x"]
-ϵ_p = parsed_args["eps_p"]
+ϵ_x = [0.01]
+ϵ_p = [0.01, 1]
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
-
 
 if isnothing(ϵ_p)
     @assert !allow_exists_and_forall_bisection "eps_p was not provided. Refinement requires eps_p. Use --help for more information."
@@ -54,45 +45,64 @@ end
 
 filename = splitext(PROGRAM_FILE)[1]
 
-n = 1
-p = 4
-P_x(t) = sin(t+π/4) + 2*sin(3*t-3*π/4-1) + sin(3.2*t+π/4-0.9)
-P_y(t) = cos(t+π/4) + 2*cos(3*t-3*π/4-1) + cos(3.2*t+π/4-0.9)
-dP_x(t) = cos(t+π/4) + 6*cos(3*t-3*π/4-1) + 3.2*cos(3.2*t+π/4-0.9)
-dP_y(t) = -sin(t+π/4) - 6*sin(3*t-3*π/4-1) - 3.2*sin(3.2*t+π/4-0.9)
-f_fun = [x -> (x[1] - P_x(x[3]))^2 + (x[2] - P_y(x[3]))^2 - x[4]]
-Df_fun = [x -> [(2*(x[1]-P_x(x[3]))) (2*(x[2]-P_y(x[3]))) (-dP_x(x[3])*2*(x[1]-P_x(x[3]))-dP_y(x[3])*2*(x[2]-P_y(x[3]))) -1]]
-problem = Problem(f_fun, Df_fun)
-qvs = [(Forall, 3)]
-qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
-X_0 = IntervalBox(interval(0, 5), interval(0, 5))
-p_in = [[interval(0, 2)]]
+nnet = read_onnx_mlp("normed_etcs_2x250_nodes.onnx")
+N(x) = NeuralVerification.compute_output(nnet, x)
+DN(x) = get_gradient(nnet, x)
+
+confidence(vect::AbstractVector) = vect[1] - vect[2]
+confidence(mat::Matrix) = mat[1, :] - mat[2, :]
+
+gradient_variables = [1; 0; 0]
+
+x_h = 20/50
+x_r = 35/50
+
+function perturbation(x)
+    return [x[1] + x[2], x_h, x_r]
+end
+
+function gradient_perturbation(x)
+    return [1 1; 0 0; 0 0]
+end
+
+n = 2
+p = 5
+f_fun = [x -> (confidence(N([x[2], x_h, x_r])) - x[1] - x[4]), x -> (confidence(N(perturbation(x[2:3]))) - x[5])]
+Df_fun = [x -> [-1 confidence(DN(IntervalBox([x[2], x_h, x_r])) * gradient_variables)... 0 -1 0],
+        x -> [0 confidence(DN(IntervalBox(perturbation(x[2:3]))) * gradient_perturbation(x[2:3]))... 0 -1]]
+
+problem = Problem(f_fun, Df_fun, [[1], [2]])
+qvs = [(Forall, 2), (Forall, 3)]
+qcp = QuantifiedConstraintProblem(problem, qvs, [qvs, qvs], p, n)
+X_0 = IntervalBox(interval(0.95, 1))
+p_in = [[interval(25/149, 1)], [interval(-2/149, 2/149)]]
 p_out = deepcopy(p_in)
-G = [interval(0.25, 25)]
+G = [interval(minus_inf, -strict_epsilon), interval(strict_epsilon, plus_inf)]
 
 if allow_exists_and_forall_bisection
     refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
     refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
 end
 
-println("ϵ_x = ", ϵ_x)
-println("ϵ_p = ", ϵ_p)
+using TimerOutputs
+const to = TimerOutput()
 
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
-println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
+@timeit to "pave" inn, out, delta = pave_monotonous_12(X_0, [-1], p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+
+show(to)
 
 if parsed_args["save"]
     p = plot()
     draw(p, X_0, inn, out, delta)
 
-    plot(p)
+    plot(p, size = (600, 80), grid = false, xticks=0.95:0.01:1)
 
     if allow_exists_and_forall_bisection
-        outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_refined.png"
+        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_refined.png"
     elseif allow_exists_or_forall_bisection
-        outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_subdivided.png"
+        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
     else
-        outfile = "$(filename)_11_$(ϵ_x).png"
+        outfile = "$(filename)_$(ϵ_x).png"
     end
     savefig(outfile)
     println("The result was saved in $(outfile).")

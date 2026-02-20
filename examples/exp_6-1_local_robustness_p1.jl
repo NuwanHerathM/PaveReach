@@ -1,5 +1,5 @@
-include("utils.jl")
-include("pave.jl")
+include("../src/utils.jl")
+include("../src/pave.jl")
 
 using BenchmarkTools
 
@@ -10,28 +10,6 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table s begin
-        "x"
-            help = "input x coordinate"
-            arg_type = Float64
-            required = true
-        "y"
-            help = "input y coordinate"
-            arg_type = Float64
-            required = true
-        # "eps_x"
-        #     help = "epsilon for the paving"
-        #     arg_type = Float64
-        #     required = true
-        # "eps_p"
-        #     help = "epsilon for the parameters"
-        #     arg_type = Float64
-        #     required = false
-        "--refine", "-r"
-            help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
-            action = :store_true
-        "--subdivide", "-s"
-            help = "bisect the parameters with either ∀ or ∃, requires eps_p, does not work with --refine"
-            action = :store_true
         "--save"
             help = "save the output"
             action = :store_true
@@ -42,15 +20,13 @@ end
 
 parsed_args = parse_commandline()
 # ------------------------------------------------------
-input_x = parsed_args["x"]
-input_y = parsed_args["y"]
+input_x = 0.5
+input_y = -0.35
 
-# ϵ_x = parsed_args["eps_x"]
-# ϵ_p = parsed_args["eps_p"]
 ϵ_x = [0.05]
 ϵ_p = nothing
-allow_exists_and_forall_bisection = parsed_args["refine"]
-allow_exists_or_forall_bisection = parsed_args["subdivide"]
+allow_exists_and_forall_bisection = false
+allow_exists_or_forall_bisection = false
 
 
 if isnothing(ϵ_p)
@@ -94,8 +70,9 @@ X_0 = IntervalBox(interval(0, 1))
 ϵ_max = 0.5
 p_in = [[interval(-ϵ_max, ϵ_max)], [interval(-ϵ_max, ϵ_max)]]
 p_out = deepcopy(p_in)
-G = [interval(0.0001, 100000)]
+G = [interval(strict_epsilon, 100000)]
 
+# @btime(global inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
 inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
 
 if parsed_args["save"]

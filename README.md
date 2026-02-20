@@ -13,15 +13,98 @@ We refer here to sections, figures and tables of the article that uses this arti
 ```julia
 include("pave.jl")
 ...
-inn, out, delta = paving11(...)
+inn, out, delta = paving_11(...)
 ```
 
-For a quantified set $\Sigma$, the paving function `paving11` returns
+For a quantified set $\Sigma$, the paving function `paving_11` returns
 - the inside $\Sigma^-$ in  `inn`,
 - the outside $(\Sigma^\complement)^-$ in `out`,
 - and the potential boundary $\Sigma^\Delta$ in `delta`.
 
 For the different paving functions, see [Oracles](#oracles).
+
+## Reproducing experimental results (figures)
+
+> Note: Some figures where produced with erroneous scripts. The analysis presented in the paper is still valid for them. In such cases, the present scripts produce correct equivalent outputs. We will replace them in the final version.
+
+### Figure 2
+
+Run
+```
+julia exp_6-1_classification.jl 0 --save
+julia exp_6-1_classification.jl 0.125 --save
+```
+
+### Figure 4
+
+Run
+```
+julia exp_6-1_local_robustness_p1.jl --save
+julia exp_6-1_local_robustness_p2.jl --save
+```
+Due to an **error** in the experiments, theses figures are slightly different from the ones in the paper (they do not invalid anything that has been stated).
+
+### Figure 5
+
+Run
+```
+julia exp_6-1_global_robustness_landscape_class_1.jl 0.125 --help
+julia exp_6-1_global_robustness_landscape_class_2.jl 0.125 --help
+```
+
+### Figure 6
+
+Run
+```
+julia exp_6-1_global_robustness_landscape_complete.jl 0.125 --save
+```
+
+### Figure 7
+
+Run
+```
+julia exp_6-1_global_robustness_landscape_class_1.jl 0.5 --help
+julia exp_6-1_global_robustness_landscape_class_2.jl 1 --help
+```
+
+### Figure 8
+
+Run
+```
+julia exp_6-1_global_robustness_minimization.jl -r --save
+```
+This figure is slightly different, with the current parameters of the algorithm there is no region classified as outside.
+
+### Figure 9
+
+We look at $C_{N,2} > 0.0001$ (there is a typo in the paper: $C_{N,1}$ should be $C_{N,2}$).
+Run
+```
+julia exp_6-2_classification.jl 0.0001 --save
+```
+
+### Figure 10
+
+Run
+```
+julia exp_6-2_global_robustness_landscape.jl 0.98 --save
+julia exp_6-2_global_robustness_landscape.jl 1 --save
+```
+
+### Figure 11
+
+Run
+```
+julia exp_6-2_global_robustness_minimization.jl -r --save
+```
+
+### Figure 12
+
+Run
+```
+julia exp_6-2_global_robustness_lambda_delta_optimization.jl -r --save
+```
+(This actually took 10 min and not 30 min  as stated in the paper.)
 
 ## Dependencies
 
@@ -260,8 +343,8 @@ Select one of the four paving functions according to this table
 
 |   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $\mathbb{G}$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$
 |---|---|---
-| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$                  | `pave11` | `pave12`
-| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$ | `pave21` | `pave22`
+| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$                  | `pave_11` | `pave_12`
+| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$ | `pave_21` | `pave_22`
 
 > Note: the user does not have to construct $\neg\mathbb{P}$ or $\mathbb{G}^\complement$. The four paving functions take $\mathbb{P}$ and $\mathbb{G}$ as input, so swapping between the functions amounts only to changing the name of the function.
 
