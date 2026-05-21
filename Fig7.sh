@@ -1,8 +1,0 @@
-#!/bin/bash
-
-filename=ex_5-4_circle_collision
-
-eps_x=0.1
-eps_p=0.1
-echo "$eps_x"
-docker run -v .:/app globalqe examples/${filename}.jl $eps_x $eps_p -r --with_luxor

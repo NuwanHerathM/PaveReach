@@ -33,7 +33,7 @@ p = 3
 @variables x[1:p]
 f_num = [x[1]^2 + x[2]^2 - x[3]]
 f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-problem = Problem(f_fun, Df_fun)
+problem = Problem(f_fun, Df_fun, [[1]])
 qvs = []
 qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
 X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))

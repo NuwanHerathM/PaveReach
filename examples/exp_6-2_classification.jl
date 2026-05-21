@@ -1,7 +1,7 @@
+include("../src/utils.jl")
 include("../src/pave.jl")
+include("../src/read_onnx.jl")
 
-using Plots.PlotMeasures
-using LaTeXStrings
 using BenchmarkTools
 
 # ------------------------------------------------------
@@ -11,25 +11,26 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table s begin
-        "eps_x"
-            help = "epsilon for the paving"
+        "delta"
+            help = "confidence delta"
             arg_type = Float64
             required = true
-        "eps_p"
-            help = "epsilon for the parameters"
-            arg_type = Float64
-            required = false
+        # "eps_x"
+        #     help = "epsilon for the paving"
+        #     arg_type = Float64
+        #     required = true
+        # "eps_p"
+        #     help = "epsilon for the parameters"
+        #     arg_type = Float64
+        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
         "--subdivide", "-s"
             help = "bisect the parameters with either ∀ or ∃, requires eps_p, does not work with --refine"
             action = :store_true
-        "--with_plots"
-            help = "generate the output with Plots.jl"
-            action = :store_true
-        "--with_luxor"
-            help = "generate the output with Luxor.jl"
+        "--save"
+            help = "save the output"
             action = :store_true
     end
 
@@ -38,8 +39,12 @@ end
 
 parsed_args = parse_commandline()
 # ------------------------------------------------------
-ϵ_x = parsed_args["eps_x"]
-ϵ_p = parsed_args["eps_p"]
+δ = parsed_args["delta"]
+
+# ϵ_x = parsed_args["eps_x"]
+# ϵ_p = parsed_args["eps_p"]
+ϵ_x = [0.01]
+ϵ_p = nothing
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
 
@@ -53,60 +58,54 @@ else
     end
 end
 @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
-
-use_plots = parsed_args["with_plots"]
-use_luxor = parsed_args["with_luxor"]
-
-@assert nand(use_plots, use_luxor) "Plots and Luxor are mutually exclusive. Use --help for more information."
 # ------------------------------------------------------
 
 filename = splitext(PROGRAM_FILE)[1]
 
+nnet = read_onnx_mlp("normed_etcs_2x250_nodes.onnx")
+N(x) = NeuralVerification.compute_output(nnet, x)
+DN(x) = get_gradient(nnet, x)
+
+# confidence_1(vect::AbstractVector) = vect[1] - vect[2]
+# confidence_1(mat::Matrix) = mat[1, :] - mat[2, :]
+confidence_2(vect::AbstractVector) = vect[2] - vect[1]
+confidence_2(mat::Matrix) = mat[2, :] - mat[1, :]
+
+gradient_variables = [1 0 0; 0 1 0; 0 0 1]
+
 n = 1
 p = 4
-f_fun = [x -> (2.5*sin(x[3]) - x[1])^2 + (2.5*cos(x[3]) - x[2])^2 - x[4]]
-Df_fun = [x -> [(-2*(2.5*sin(x[3]) - x[1])) (-2*(2.5*cos(x[3]) - x[2])) (5*cos(x[3])*(2.5*sin(x[3]) - x[1]) - 5*sin(x[3])*(2.5*cos(x[3]) - x[2])) -1]]
-problem = Problem(f_fun, Df_fun)
-qvs = [(Forall, 3)]
+f_fun = [x -> (confidence_2(N([x[1], x[2], x[3]])) - x[4])]
+Df_fun = [x -> [confidence_2(DN(IntervalBox([x[1], x[2], x[3]])) * gradient_variables)... -1]]
+problem = Problem(f_fun, Df_fun, [[1]])
+qvs = [(Forall, 2), (Forall, 3)]
 qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
-X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
-p_in = [[interval(-π, π)]]
+X_0 = IntervalBox(interval(25/149, 1))
+p_in = [[interval(0, 800/50000)], [interval(0, 800/50000)]]
 p_out = deepcopy(p_in)
-G = [interval(0.25, 100)]
+G = [interval(δ, plus_inf)]
 
 if allow_exists_and_forall_bisection
     refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
     refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
 end
 
-println("ϵ_x = ", ϵ_x)
-println("ϵ_p = ", ϵ_p)
+@btime(global inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
+print_inn_out_delta(inn, out, delta)
 
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
-println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
-
-if allow_exists_and_forall_bisection
-    outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_refined.png"
-elseif allow_exists_or_forall_bisection
-    outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_subdivided.png"
-else
-    outfile = "$(filename)_11_$(ϵ_x).png"
-end
-
-if use_plots
+if parsed_args["save"]
     p = plot()
     draw(p, X_0, inn, out, delta)
-    plot(p)
-    savefig(outfile)
-    println("The result was saved in $(outfile).")
-end
 
-if use_luxor
-    width = 600
-    height = 600
-    buffer = 50
-    Drawing(width + 2*buffer, height + 2*buffer, outfile)
-    luxor_draw(X_0, inn, out, delta, width, height, buffer)
-    finish()
+    plot(p, size=(600, 80), grid=false, xticks=([25/149, 50/149, 75/149, 100/149, 125/149, 1], [25, 50, 75, 100, 125, 149]))
+
+    if allow_exists_and_forall_bisection
+        outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_refined.png"
+    elseif allow_exists_or_forall_bisection
+        outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
+    else
+        outfile = "$(filename)_$(δ)_$(ϵ_x).png"
+    end
+    savefig(outfile)
     println("The result was saved in $(outfile).")
 end

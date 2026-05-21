@@ -1,7 +1,7 @@
+include("../src/utils.jl")
 include("../src/pave.jl")
 
-using Plots.PlotMeasures
-using LaTeXStrings
+using NeuralVerification
 using BenchmarkTools
 
 # ------------------------------------------------------
@@ -11,14 +11,18 @@ function parse_commandline()
     s = ArgParseSettings()
 
     @add_arg_table s begin
-        "eps_x"
-            help = "epsilon for the paving"
+        "delta"
+            help = "confidence delta"
             arg_type = Float64
             required = true
-        "eps_p"
-            help = "epsilon for the parameters"
-            arg_type = Float64
-            required = false
+        # "eps_x"
+        #     help = "epsilon for the paving"
+        #     arg_type = Float64
+        #     required = true
+        # "eps_p"
+        #     help = "epsilon for the parameters"
+        #     arg_type = Float64
+        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
@@ -38,8 +42,12 @@ end
 
 parsed_args = parse_commandline()
 # ------------------------------------------------------
-ϵ_x = parsed_args["eps_x"]
-ϵ_p = parsed_args["eps_p"]
+δ = parsed_args["delta"]
+
+# ϵ_x = parsed_args["eps_x"]
+# ϵ_p = parsed_args["eps_p"]
+ϵ_x = [0.05, 0.05]
+ϵ_p = nothing
 allow_exists_and_forall_bisection = parsed_args["refine"]
 allow_exists_or_forall_bisection = parsed_args["subdivide"]
 
@@ -62,39 +70,33 @@ use_luxor = parsed_args["with_luxor"]
 
 filename = splitext(PROGRAM_FILE)[1]
 
+nnet = read_nnet("running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
+N(x) = NeuralVerification.compute_output(nnet, x)
+DN(x) = get_gradient(nnet, x)
+
+confidence(vect::AbstractVector) = vect[1] - vect[2]
+confidence(mat::Matrix) = mat[1, :] - mat[2, :]
+
 n = 1
-p = 4
-P_x(t) = sin(t+π/4) + 2*sin(3*t-3*π/4-1) + sin(3.2*t+π/4-0.9)
-P_y(t) = cos(t+π/4) + 2*cos(3*t-3*π/4-1) + cos(3.2*t+π/4-0.9)
-dP_x(t) = cos(t+π/4) + 6*cos(3*t-3*π/4-1) + 3.2*cos(3.2*t+π/4-0.9)
-dP_y(t) = -sin(t+π/4) - 6*sin(3*t-3*π/4-1) - 3.2*sin(3.2*t+π/4-0.9)
-f_fun = [x -> (x[1] - P_x(x[3]))^2 + (x[2] - P_y(x[3]))^2 - x[4]]
-Df_fun = [x -> [(2*(x[1]-P_x(x[3]))) (2*(x[2]-P_y(x[3]))) (-dP_x(x[3])*2*(x[1]-P_x(x[3]))-dP_y(x[3])*2*(x[2]-P_y(x[3]))) -1]]
-problem = Problem(f_fun, Df_fun)
-qvs = [(Forall, 3)]
+p = 3
+f_fun = [x -> (confidence(N(x[1:2])) - x[3])]
+Df_fun = [x -> [confidence(DN(x[1:2]))... -1]]
+problem = Problem(f_fun, Df_fun, [[1]])
+qvs = []
 qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
-X_0 = IntervalBox(interval(0, 5), interval(0, 5))
-p_in = [[interval(0, 2)]]
+X_0 = IntervalBox(interval(-1, 1), interval(-1, 1))
+p_in = []
 p_out = deepcopy(p_in)
-G = [interval(0.25, 25)]
+G = [interval(δ + strict_epsilon, plus_inf)]
+
+inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
 
 if allow_exists_and_forall_bisection
-    refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
-    refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
-end
-
-println("ϵ_x = ", ϵ_x)
-println("ϵ_p = ", ϵ_p)
-
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
-println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
-
-if allow_exists_and_forall_bisection
-    outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_refined.png"
+    outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_refined.png"
 elseif allow_exists_or_forall_bisection
-    outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_subdivided.png"
+    outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
 else
-    outfile = "$(filename)_11_$(ϵ_x).png"
+    outfile = "$(filename)_$(δ)_$(ϵ_x).png"
 end
 
 if use_plots
