@@ -1,5 +1,7 @@
 include("../src/pave.jl")
 
+using BenchmarkTools
+
 # ------------------------------------------------------
 using ArgParse
 
@@ -58,7 +60,7 @@ println("ϵ_p  = ", ϵ_p)
 println(if allow_exists_and_forall_bisection "Refined" else "Not refined" end)
 println(if allow_exists_or_forall_bisection "Normal bisection on P" else "No standard bisection on P" end)
 
-inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 if allow_exists_and_forall_bisection

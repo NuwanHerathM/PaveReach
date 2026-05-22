@@ -189,7 +189,7 @@ function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         problem = qcp.problem
         G = disjunction(last(intervals, qcp.n), problem.dnf_indices)
         for G_i in G
-            R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_i...])
+            R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_i...])
             if all(!isempty(R_inner[i]) && interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qcp.n)
                 return true
             end
@@ -209,14 +209,14 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         if any(isempty, G_minus)
             test_minus = true
         else
-            _, R_outer_minus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_minus...])
+            R_outer_minus = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_minus...])
             test_minus = any([interval(0, 0) ⊈ interval(min(R_outer_minus[i]), max(R_outer_minus[i])) for i in 1:qcp.n])
         end
         G_plus = [interval(intervals[end-i].hi, ∞) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
         if any(isempty, G_plus)
             test_plus = true
         else
-            _, R_outer_plus = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_plus...])
+            R_outer_plus = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_plus...])
             test_plus = any([interval(0, 0) ⊈ interval(min(R_outer_plus[i]), max(R_outer_plus[i])) for i in 1:qcp.n])
         end
         return test_minus && test_plus
@@ -235,7 +235,7 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         #     return true
         # end
         # _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G...])
-        _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
+        R_outer = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
         if all(isempty, R_outer)
             return true
         end
@@ -252,7 +252,7 @@ function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         problem = qcp.problem
         G_complement = complement_disjunction(last(intervals, qcp.n), problem.dnf_indices)
         for G_complement_i in G_complement
-            R_inner, _ = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_complement_i...])
+            R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_complement_i...])
             if all(!isempty(R_inner[i]) && interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qcp.n)
                 return true
             end

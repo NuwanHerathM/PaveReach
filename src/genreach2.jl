@@ -273,36 +273,15 @@ function build_function_f_Df(f_num::Vector{Num}, x, n::Int, p::Int)
   return f_fun, Df_fun
 end
 
-function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
-  global out = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
+function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers, q, p, n, input)
   global inn = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
 
   radii = [IntervalArithmetic.radius(input[i]) for i=1:p]
   input_center = [mid(input[i]) for i=1:p]
    
   for j in 1:n
-     c = Base.invokelatest(g_fun[j],input_center)
-     range_Dg = Base.invokelatest(Dg_fun[j],input)
-
-     outer = interval(c,c)
-      # println(outer)
-    for i = 2p-1:-2:1
-      if quantifiers[i] == "exists"
-        outer = outer+O(range_Dg,radii,quantifiers[i+1])
-      else
-        outer = slash(outer,I(range_Dg,radii,quantifiers[i+1]))
-        if (outer==EmptySet(1))
-          break
-        end
-      end
-      # println(outer)
-    end
-  
-    if (outer==EmptySet(1))
-      push!(out,outer) 
-    else
-      push!(out,LazySets.Interval(outer))
-    end
+    c = Base.invokelatest(g_fun[j],input_center)
+    range_Dg = Base.invokelatest(Dg_fun[j],input)
 
     inner = interval(c,c)
   
@@ -324,7 +303,41 @@ function QEapprox_o0(g_fun, Dg_fun, quantifiers, q, p, n, input)
     end
   end
   
-  return (inn, out)
+  return inn
+end
+
+function QEapprox_o0_outer(g_fun, Dg_fun, quantifiers, q, p, n, input)
+  global out = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
+
+  radii = [IntervalArithmetic.radius(input[i]) for i=1:p]
+  input_center = [mid(input[i]) for i=1:p]
+   
+  for j in 1:n
+    c = Base.invokelatest(g_fun[j],input_center)
+    range_Dg = Base.invokelatest(Dg_fun[j],input)
+
+    outer = interval(c,c)
+    
+    for i = 2p-1:-2:1
+      if quantifiers[i] == "exists"
+        outer = outer+O(range_Dg,radii,quantifiers[i+1])
+      else
+        outer = slash(outer,I(range_Dg,radii,quantifiers[i+1]))
+        if (outer==EmptySet(1))
+          break
+        end
+      end
+      # println(outer)
+    end
+  
+    if (outer==EmptySet(1))
+      push!(out,outer) 
+    else
+      push!(out,LazySets.Interval(outer))
+    end
+  end
+  
+  return out
 end
 
 function QEapprox_o1(g, quantifiers, p, n)
