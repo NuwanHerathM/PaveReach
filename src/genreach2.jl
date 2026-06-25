@@ -259,7 +259,7 @@ function IZon(lin, k, n)
   return LazySets.Interval(-abs(lin[1,k]),abs(lin[1,k]))   
 end
 
-function build_function_f_Df(f_num::Vector{Num}, x, n::Int, p::Int)
+function build_function_f_Df(f_num, x, n::Int, p::Int)
   f_fun = Function[]
   Df_fun = Function[]
   for j in 1:n

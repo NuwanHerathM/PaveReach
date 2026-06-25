@@ -115,7 +115,7 @@ end
 
 increment!(indices, lengths, pos) = increment!(indices, lengths, pos, 0)
 
-function complement(x::IntervalArithmetic.Interval)
+function complement(x::IntervalArithmetic.Interval{T}) where T <: Number
     l = []
     if x.lo != minus_inf
         push!(l, interval(minus_inf, x.lo - strict_epsilon))
@@ -180,6 +180,337 @@ function disjunction(G::Vector{IntervalArithmetic.Interval{T}}, dnf_indices::Vec
     return disjunction
 end
 
+"Custom version of isbounded to handle pseudo_infinity values."
+function is_bounded(interval::IntervalArithmetic.Interval{T}) where T <: Number
+    return !isempty(interval) && interval.lo != minus_inf && interval.hi != plus_inf
+end
+
+function is_bounded(intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Number
+    return all(is_bounded, intervals)
+end
+
+function atom_conjunction(atom::Atom, n::Int)
+    if n == 1
+        return atom
+    end
+    conjuncted_predicates = [Atom("$(atom.value)_$(i)") for i in 1:n]
+    return ∧(conjuncted_predicates...)
+end
+
+function atom_complement_disjunction(atom::Atom, intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Number
+    if length(intervals) == 1
+        interval = first(intervals)
+        if is_bounded(interval)
+            atom_1 = Atom("$(atom.value)_1")
+            atom_2 = Atom("$(atom.value)_2")
+            return atom_1 ∨ atom_2
+        else
+            return atom
+        end
+    end
+
+    i = 1
+    disjuncted_predicates = []
+    for interval in intervals
+        value_i = "$(atom.value)_$(i)"
+        if is_bounded(interval)
+            atom_1 = Atom(value_i * "_1")
+            atom_2 = Atom(value_i * "_2")
+            push!(disjuncted_predicates, atom_1 ∨ atom_2)
+        else
+            push!(disjuncted_predicates, Atom(value_i))
+        end
+        i += 1
+    end
+    if length(disjuncted_predicates) == 1
+        return first(disjuncted_predicates)
+    else
+        return ∨(disjuncted_predicates...)
+    end
+end
+
+function expand_1(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms) where T <: Number
+    if M isa Atom
+        indices = indices_dict[M.value]
+        n_indices = last(indices) - first(indices) + 1
+        return atom_conjunction(M, n_indices)
+    elseif token(M) == ∧
+        return expand_1(first(M.children), indices_dict, intervals, atoms) ∧ expand_1(last(M.children), indices_dict, intervals, atoms)
+    elseif token(M) == ∨
+        return expand_1(first(M.children), indices_dict, intervals, atoms) ∨ expand_1(last(M.children), indices_dict, intervals, atoms)
+    elseif token(M) == ¬
+        atom = first(M.children)
+        if !(atom isa Atom)
+            error("The formula should only contain negations at the leaves.")
+        else
+            range = indices_dict[atom.value]
+            sub_intervals = intervals[range]
+            return atom_complement_disjunction(atom, sub_intervals)
+        end
+    else
+        error("Unknown syntax tree type: $(typeof(M)).")
+    end
+end
+
+expand_1(M, indices_dict, intervals) = expand_1(M, indices_dict, intervals, atoms(M))
+
+function expand_2(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms, previous_token=nothing) where T <: Number
+    if M isa Atom
+        if previous_token != ¬
+            range = indices_dict[M.value]
+            sub_intervals = intervals[range]
+            return atom_complement_disjunction(M, sub_intervals)
+        else
+            indices = indices_dict[M.value]
+            n_indices = last(indices) - first(indices) + 1
+            return atom_conjunction(M, n_indices)
+        end
+    elseif token(M) == ∧
+        if previous_token == ¬
+            error("The formula should only contain negations at the leaves.")
+        else
+            return expand_2(first(M.children), indices_dict, intervals, atoms) ∨ expand_2(last(M.children), indices_dict, intervals, atoms)
+        end
+    elseif token(M) == ∨
+        if previous_token == ¬
+            error("The formula should only contain negations at the leaves.")
+        else
+            return expand_2(first(M.children), indices_dict, intervals, atoms) ∧ expand_2(last(M.children), indices_dict, intervals, atoms)
+        end
+    elseif token(M) == ¬
+        return expand_2(first(M.children), indices_dict, intervals, atoms, ¬)
+    else
+        error("Unknown syntax tree type: $(typeof(M)).")
+    end
+end
+
+expand_2(M, indices_dict, intervals) = expand_2(M, indices_dict, intervals, atoms(M))
+
+# function expand_negations_1(M, indices_dict, intervals, atoms)
+#     if M isa Atom
+#         return M
+#     elseif token(M) == ∧
+#         return expand_negations_1(first(M.children), intervals, atoms) ∧ expand_negations_1(last(M.children), intervals, atoms)
+#     elseif token(M) == ∨
+#         return expand_negations_1(first(M.children), intervals, atoms) ∨ expand_negations_1(last(M.children), intervals, atoms)
+#     elseif token(M) == ¬
+#         atom = first(M.children)
+#         pos = findfirst(x -> x == atom, atoms)
+#         interval = intervals[pos]
+#         if is_bounded(interval)
+#             atom_1 = Atom(atom.value * "_1")
+#             atom_2 = Atom(atom.value * "_2")
+#             return atom_1 ∨ atom_2
+#         else
+#             return atom
+#         end
+#     else
+#         error("Unknown syntax tree type: $(typeof(M))")
+#     end
+# end
+
+# expand_negations_1(M, intervals) = expand_negations_1(M, intervals, atoms(M))
+
+# function expand_negations_2(M, intervals, indices_dict, atoms, previous_token=nothing)
+#     if M isa Atom
+#         if previous_token != ¬
+#             pos = findfirst(x -> x == M, atoms)
+#             interval = intervals[pos]
+#             if is_bounded(interval)
+#                 atom_1 = Atom(M.value * "_1")
+#                 atom_2 = Atom(M.value * "_2")
+#                 return atom_1 ∨ atom_2
+#             else
+#                 return M
+#             end
+#         else
+#             return M
+#         end
+#     elseif token(M) == ∧
+#         return expand_negations_2(first(M.children), intervals, atoms) ∨ expand_negations_2(last(M.children), intervals, atoms)
+#     elseif token(M) == ∨
+#         return expand_negations_2(first(M.children), intervals, atoms) ∧ expand_negations_2(last(M.children), intervals, atoms)
+#     elseif token(M) == ¬
+#         return expand_negations_2(first(M.children), intervals, atoms, ¬)
+#     else
+#         error("Unknown syntax tree type: $(typeof(M))")
+#     end
+# end
+
+# expand_negations_2(M, intervals) = expand_negations_2(M, intervals, atoms(M))
+
+function duplication_positions_1(M, indices_dict, intervals)
+    positions = Int[]
+    to_visit = Union{Atom,SyntaxBranch}[M]
+    while !isempty(to_visit)
+        current = pop!(to_visit)
+        if current isa Atom
+            continue
+        elseif (token(current) == ∧) || (token(current) == ∨)
+            append!(to_visit, children(current))
+        elseif token(current) == ¬
+            atom = first(current.children)
+            range = indices_dict[atom.value]
+            for i in range
+                interval = intervals[i]
+                if is_bounded(interval)
+                    push!(positions, i)
+                end
+            end
+        else
+            error("Unknown syntax tree type: $(typeof(current))")
+        end
+    end
+    return positions
+end
+
+function duplication_positions_2(M, indices_dict, intervals)
+    positions = Int[]
+    to_visit = Tuple{Union{Atom,SyntaxBranch},Union{Nothing,Connective}}[(M, nothing)]
+    while !isempty(to_visit)
+        current, previous_token = pop!(to_visit)
+        if current isa Atom
+            if previous_token != ¬
+                range = indices_dict[current.value]
+                for i in range
+                    interval = intervals[i]
+                    if is_bounded(interval)
+                        push!(positions, i)
+                    end
+                end
+            end
+        elseif (token(current) == ∧) || (token(current) == ∨)
+            child_1, child_2 = children(current)
+            push!(to_visit, (child_1, nothing))
+            push!(to_visit, (child_2, nothing))
+        elseif token(current) == ¬
+        else
+            error("Unknown syntax tree type: $(typeof(current))")
+        end
+    end
+    return positions
+end
+
+function complement_ranges_1(M, indices_dict)
+    ranges = UnitRange[]
+    to_visit = Union{Atom,SyntaxBranch}[M]
+    while !isempty(to_visit)
+        current = pop!(to_visit)
+        if current isa Atom
+            continue
+        elseif (token(current) == ∧) || (token(current) == ∨)
+            append!(to_visit, children(current))
+        elseif token(current) == ¬
+            atom = first(current.children)
+            range = indices_dict[atom.value]
+            push!(ranges, range)
+        else
+            error("Unknown syntax tree type: $(typeof(current))")
+        end
+    end
+    return ranges
+end
+
+function complement_ranges_2(M, indices_dict)
+    ranges = UnitRange[]
+    to_visit = Tuple{Union{Atom,SyntaxBranch},Union{Nothing,Connective}}[(M, nothing)]
+    while !isempty(to_visit)
+        current, previous_token = pop!(to_visit)
+        if current isa Atom
+            if previous_token != ¬
+                range = indices_dict[current.value]
+                push!(ranges, range)
+            end
+        elseif (token(current) == ∧) || (token(current) == ∨)
+            child_1, child_2 = children(current)
+            push!(to_visit, (child_1, nothing))
+            push!(to_visit, (child_2, nothing))
+        elseif token(current) == ¬
+            continue
+        else
+            error("Unknown syntax tree type: $(typeof(current))")
+        end
+    end
+    return ranges
+end
+
+function expand_intervals(intervals, ranges)
+    positions = vcat(map(collect, ranges)...)
+    expanded_intervals = []
+    for i in 1:length(intervals)
+        if i in positions
+            complement_intervals = complement(intervals[i])
+            for interval in complement_intervals
+                push!(expanded_intervals, interval)
+            end
+        else
+            push!(expanded_intervals, intervals[i])
+        end
+    end
+    return expanded_intervals
+end
+
+function inflate(l, indices)
+    inflated = []
+    for (i, item) in enumerate(l)
+        if i in indices
+            push!(inflated, item)
+            push!(inflated, item)
+        else
+            push!(inflated, item)
+        end
+    end
+    return inflated
+end
+
+function is_zero_in(R, i)
+    return !isempty(R[i]) && interval(0, 0) ⊆ interval(min(R[i]), max(R[i]))
+end
+
+function is_zero_not_in(R, i)
+    return isempty(R[i]) || interval(0,0) ⊈ interval(min(R[i]), max(R[i]))
+end
+
+function test_in_1(M, R, positions_dict)
+    @match M begin
+        ::Atom => is_zero_in(R, positions_dict[M.value])
+        ::SyntaxBranch where (token(M) == ∧) => all(test_in_1(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∨) => any(test_in_1(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
+        _ => error("Unknown syntax tree type: $(typeof(M))")
+    end
+end
+
+function test_out_1(M, R, positions_dict)
+    @match M begin
+        ::Atom => is_zero_not_in(R, positions_dict[M.value])
+        ::SyntaxBranch where (token(M) == ∧) => any(test_out_1(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∨) => all(test_out_1(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
+        _ => error("Unknown syntax tree type: $(typeof(M))")
+    end
+end
+
+function test_in_2(M, R, positions_dict)
+    @match M begin
+        ::Atom => is_zero_not_in(R, positions_dict[M.value])
+        ::SyntaxBranch where (token(M) == ∧) => any(test_in_2(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∨) => all(test_in_2(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
+        _ => error("Unknown syntax tree type: $(typeof(M))")
+    end
+end
+
+function test_out_2(M, R, positions_dict)
+    @match M begin
+        ::Atom => is_zero_in(R, positions_dict[M.value])
+        ::SyntaxBranch where (token(M) == ∧) => all(test_out_2(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∨) => any(test_out_2(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
+        _ => error("Unknown syntax tree type: $(typeof(M))")
+    end
+end
+
 function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where {N, T<:Number}
         quantifiers = [[(Forall, i) for i in 1:length(X)]..., qcp.qvs..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...]
@@ -187,14 +518,9 @@ function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]..., qcp.qvs_relaxed[j]..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
-        G = disjunction(last(intervals, qcp.n), problem.dnf_indices)
-        for G_i in G
-            R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_i...])
-            if all(!isempty(R_inner[i]) && interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qcp.n)
-                return true
-            end
-        end
-        return false
+        # G = last(intervals, qcp.n)
+        R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
+        return test_in_1(problem.M, R_inner, problem.positions_dict)
     end
 end
 
@@ -205,21 +531,10 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]..., negation.(qcp.qvs_relaxed[j])..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
-        G_minus = [interval(-∞, intervals[end-i].lo) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
-        if any(isempty, G_minus)
-            test_minus = true
-        else
-            R_outer_minus = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_minus...])
-            test_minus = any([interval(0, 0) ⊈ interval(min(R_outer_minus[i]), max(R_outer_minus[i])) for i in 1:qcp.n])
-        end
-        G_plus = [interval(intervals[end-i].hi, ∞) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
-        if any(isempty, G_plus)
-            test_plus = true
-        else
-            R_outer_plus = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_plus...])
-            test_plus = any([interval(0, 0) ⊈ interval(min(R_outer_plus[i]), max(R_outer_plus[i])) for i in 1:qcp.n])
-        end
-        return test_minus && test_plus
+        # G_minus = [interval(-∞, intervals[end-i].lo) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
+        # G = last(intervals, qcp.n)
+        R_outer = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
+        return test_in_2(problem.M, R_outer, problem.positions_dict) 
     end
 end
 
@@ -230,16 +545,8 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]..., qcp.qvs_relaxed[j]..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
-        # G = [intervals[end-i] ∩ ϕ_bounds[end-i] for i in (qcp.n-1):-1:0]
-        # if any(isempty, G)
-        #     return true
-        # end
-        # _, R_outer = QEapprox_o0(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G...])
         R_outer = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
-        if all(isempty, R_outer)
-            return true
-        end
-        return  any([interval(0,0) ⊈ interval(min(R_outer[i]), max(R_outer[i])) for i in 1:qcp.n if !isempty(R_outer[i])])
+        return test_out_1(problem.M, R_outer, problem.positions_dict)
     end
 end
 
@@ -250,20 +557,16 @@ function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]..., negation.(qcp.qvs_relaxed[j])..., [(Exists, qcp.p-i) for i in (qcp.n-1):-1:0]...] for j in 1:qcp.n]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
-        G_complement = complement_disjunction(last(intervals, qcp.n), problem.dnf_indices)
-        for G_complement_i in G_complement
-            R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals[1:end-qcp.n]..., G_complement_i...])
-            if all(!isempty(R_inner[i]) && interval(0, 0) ⊆ interval(min(R_inner[i]), max(R_inner[i])) for i in 1:qcp.n)
-                return true
-            end
-        end
-        return false
+        # G_complement = complement_disjunction(last(intervals, qcp.n), problem.dnf_indices)
+        # G = last(intervals, qcp.n)
+        R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
+        return test_out_2(problem.M, R_inner, problem.positions_dict)
     end
 end
 
-function bounds(f, X, interval)
-    return [f[i]([X.v..., interval...]) for i in 1:length(f)]
-end
+# function bounds(f, X, interval)
+#     return [f[i]([X.v..., interval...]) for i in 1:length(f)]
+# end
 
 function check_is_in(X_0, p_in, G, qcp, criterion)
     @assert criterion == 1 || criterion == 2
@@ -318,7 +621,6 @@ function check_is_out(X_0, p_out, G, qcp, criterion)
         is_out_union = false
         while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
             sub_interval = [[p_out[i][indices[i]] for i in 1:length(p_out)]..., G...]
-            # f_bounds = bounds(qcp.problem.f, X_0, sub_interval)
             if criterion == 1
                 is_out = create_is_out_1(qcp, sub_interval)
             end
@@ -346,11 +648,13 @@ end
 check_is_out_1(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 1)
 check_is_out_2(X_0, p_in, G, qcp) = check_is_out(X_0, p_in, G, qcp, 2)
 
-function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+global z_in, z_out
+
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, criterion_in, criterion_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
     @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
     @assert length(G) == qcp.n "Length of G must be equal to the number of functions, n = $(qcp.n)."
-    @assert length(X) + length(p_in) + length(G) == qcp.p "Total number of variables, in X and p_in, must be equal to p - n = $(qcp.p - qcp.n)."
+    @assert length(X) + length(p_in) == qcp.p "Total number of variables, in X and p_in, must be equal to p = $(qcp.p)."
     @assert length(qcp.qvs) == length(p_in) "Number of quantified variables must be equal to the number of parameter boxes, $(length(p_in))."
     for qv in qcp.qvs
         @assert length(X) < index(qv) <= length(X) + length(p_in) "Quantified variables must be in the parameter space: indices between $(length(X)+1) and $(qcp.p - qcp.n)."
@@ -361,7 +665,55 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
             @assert length(X) < index(qv) <= length(X) + length(p_in) "Quantified variables must be in the parameter space: indices between $(length(X)+1) and $(qcp.p - qcp.n)."
         end
     end
-    inn = []
+    check_is_in = criterion_in == 1 ? check_is_in_1 : check_is_in_2
+    check_is_out = criterion_out == 1 ? check_is_out_1 : check_is_out_2
+    expand_in = criterion_in == 1 ? expand_1 : expand_2
+    expand_out = criterion_out == 1 ? expand_1 : expand_2
+    # expand_negations_in = criterion_in == 1 ? expand_negations_1 : expand_negations_2
+    # expand_negations_out = criterion_out == 1 ? expand_negations_1 : expand_negations_2
+    duplication_positions_in = criterion_in == 1 ? duplication_positions_1 : duplication_positions_2
+    duplication_positions_out = criterion_out == 1 ? duplication_positions_1 : duplication_positions_2
+    complement_ranges_in = criterion_in == 1 ? complement_ranges_1 : complement_ranges_2
+    complement_ranges_out = criterion_out == 1 ? complement_ranges_1 : complement_ranges_2
+    indices_dict = get_indices_dict(qcp.problem.M, sizes)
+    M_in = expand_in(qcp.problem.M, indices_dict, G)
+    M_out = expand_out(qcp.problem.M, indices_dict, G)
+    # M_out = parseformula("P_1_1 ∧ P_1_2")
+    # display(M_in)
+    # display(M_out)
+    # exit()
+    positions_in = duplication_positions_in(qcp.problem.M, indices_dict, G)
+    positions_out = duplication_positions_out(qcp.problem.M, indices_dict, G)
+    n = qcp.n
+    n_in = length(positions_in)
+    n_out = length(positions_out)
+    @variables z_in[n + n_in]
+    @variables z_out[n + n_out]
+    f_num_in = inflate(f_num, positions_in)
+    for i in 1:(n + n_in)
+        f_num_in[i] -= z_in[i]
+    end
+    f_num_out = inflate(f_num, positions_out)
+    for i in 1:(n + n_out)
+        f_num_out[i] -= z_out[i]
+    end
+    f_fun_in, Df_fun_in = build_function_f_Df(f_num_in, [variables..., z_in...], n + n_in, qcp.p + n + n_in)
+    f_fun_out, Df_fun_out = build_function_f_Df(f_num_out, [variables..., z_out...], n + n_out, qcp.p + n + n_out)
+    G_in = expand_intervals(G, complement_ranges_in(qcp.problem.M, indices_dict))
+    G_out = expand_intervals(G, complement_ranges_out(qcp.problem.M, indices_dict))
+    # display(G_in)
+    # display(G_out)
+    # exit()
+    qvs_relaxed_in = inflate(qcp.qvs_relaxed, positions_in)
+    qvs_relaxed_out = inflate(qcp.qvs_relaxed, positions_out)
+    sizes_in = inflate(sizes, positions_in)
+    sizes_out = inflate(sizes, positions_out)
+    positions_dict_in = get_positions_dict(M_in)
+    positions_dict_out = get_positions_dict(M_out)
+    problem_in = Problem(M_in, f_fun_in, Df_fun_in, positions_dict_in)
+    problem_out = Problem(M_out, f_fun_out, Df_fun_out, positions_dict_out)
+    qcp_in = QuantifiedConstraintProblem(problem_in, qcp.qvs, qvs_relaxed_in, qcp.p + n + n_in, n + n_in)
+    qcp_out = QuantifiedConstraintProblem(problem_out, qcp.qvs, qvs_relaxed_out, qcp.p + n + n_out, n + n_out)
     p_in_0 = deepcopy(p_in)
     p_out_0 = deepcopy(p_out)
     inn = []
@@ -371,9 +723,9 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
     while !isempty(list)
         X, p_in, p_out = pop!(list)
         if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
-            if check_is_in(X, p_in, G, qcp)
+            if check_is_in(X, p_in, G_in, qcp_in)
                 push!(inn, X)
-            elseif check_is_out(X, p_out, G, qcp)
+            elseif check_is_out(X, p_out, G_out, qcp_out)
                 push!(out, X)
             elseif all(map(<, IntervalArithmetic.diam.(X), ϵ_x))
                 push!(delta, X)
@@ -388,9 +740,9 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
             p_out_diams = IntervalArithmetic.diam.(first.(p_out))
             p_maxs = max.(p_in_diams, p_out_diams)
             X_diams = IntervalArithmetic.diam.(X)
-            if check_is_in(X, p_in, G, qcp)
+            if check_is_in(X, p_in, G_in, qcp_in)
                 push!(inn, X)
-            elseif check_is_out(X, p_out, G, qcp)
+            elseif check_is_out(X, p_out, G_out, qcp_out)
                 push!(out, X)
             elseif all(map(<, X_diams, ϵ_x)) && all(map(<, p_maxs, ϵ_p))
                 push!(delta, X)
@@ -435,9 +787,9 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
             p_out_diams[indices_exists] .= -1.0
             p_maxs = max.(p_in_diams, p_out_diams)
             X_diams = IntervalArithmetic.diam.(X)
-            if check_is_in(X, p_in, G, qcp)
+            if check_is_in(X, p_in, G_in, qcp_in)
                 push!(inn, X)
-            elseif check_is_out(X, p_out, G, qcp)
+            elseif check_is_out(X, p_out, G_out, qcp_out)
                 push!(out, X)
             elseif all(map(<, X_diams, ϵ_x)) && all(map(<, p_maxs, ϵ_p))
                 push!(delta, X)
@@ -473,10 +825,10 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, p_in, p_out, G, qcp, ϵ_x
     return inn, out, delta
 end
 
-pave_11(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_1, check_is_out_1)
-pave_12(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_1, check_is_out_2)
-pave_21(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_2, check_is_out_1)
-pave_22(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_2, check_is_out_2)
+pave_11(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, 1, 1)
+pave_12(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, 1, 2)
+pave_21(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, 2, 1)
+pave_22(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave(X, p_in, p_out, G, variables, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, 2, 2)
 
 function bisection_slice(box, ϵ)
     diams = IntervalArithmetic.diam.(box)
@@ -845,8 +1197,8 @@ end
 function luxor_box2pq(box)
     x = box[1]
     y = box[2]
-    p = Point(x.lo, y.lo)
-    q = Point(x.hi, y.hi)
+    p = Luxor.Point(x.lo, y.lo)
+    q = Luxor.Point(x.hi, y.hi)
     return p, q
 end
 
@@ -854,13 +1206,13 @@ function luxor_rescale(p, q, X_0, width, height, buffer)
     if isa(X_0, IntervalBox{1, <:Number})
         scale_x = width / (X_0[1].hi - X_0[1].lo)
         scale_y = height / 0.2
-        p_rescaled = Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y + 0.1) * scale_y)
-        q_rescaled = Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y + 0.1) * scale_y)
+        p_rescaled = Luxor.Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y + 0.1) * scale_y)
+        q_rescaled = Luxor.Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y + 0.1) * scale_y)
     elseif isa(X_0, IntervalBox{2, <:Number})
         scale_x = width / (X_0[1].hi - X_0[1].lo)
         scale_y = height / (X_0[2].hi - X_0[2].lo)
-        p_rescaled = Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y - X_0[2].lo) * scale_y)
-        q_rescaled = Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y - X_0[2].lo) * scale_y)
+        p_rescaled = Luxor.Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y - X_0[2].lo) * scale_y)
+        q_rescaled = Luxor.Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y - X_0[2].lo) * scale_y)
     end
     return p_rescaled, q_rescaled
 end
@@ -873,8 +1225,8 @@ end
 function luxor_draw_rows(boxes, color, X_0, width, height, buffer)
     sethue(color)
     for box in boxes
-        p = Point(box[1].lo, -0.1)
-        q = Point(box[1].hi, 0.1)
+        p = Luxor.Point(box[1].lo, -0.1)
+        q = Luxor.Point(box[1].hi, 0.1)
         p_rescaled, q_rescaled = luxor_rescale(p, q, X_0, width, height, buffer)
         Luxor.box(p_rescaled, q_rescaled, :fill)
     end
@@ -906,7 +1258,7 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer)
 
         sethue("black")
         # xticks
-        tickline(Point(buffer, buffer + height), Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
+        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
     elseif isa(X_0, IntervalBox{2, <:Number})
         background("white")
 
@@ -916,9 +1268,9 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer)
 
         sethue("black")
         # xticks
-        tickline(Point(buffer, buffer + height), Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
+        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
         # yticks
-        tickline(Point(buffer + width, buffer + height), Point(buffer + width, buffer), startnumber= X_0[2].lo, finishnumber=X_0[2].hi, major=4, minor=0)
+        tickline(Luxor.Point(buffer + width, buffer + height), Luxor.Point(buffer + width, buffer), startnumber= X_0[2].lo, finishnumber=X_0[2].hi, major=4, minor=0)
     else
         error("Plotting is only supported for 1D and 2D problems.")
     end

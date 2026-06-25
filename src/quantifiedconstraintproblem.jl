@@ -1,6 +1,7 @@
 #!/usr/local/bin/julia
 
 using Match
+using SoleLogics
 
 @enum Quantifier begin
     Forall
@@ -45,20 +46,68 @@ end
 
 #----------------------------------------------------------------------------------------
 
+function get_negated_predicates(M::SyntaxTree)
+    l = SyntaxTree[M]
+    negated = String[]
+    while !isempty(l)
+        tree = pop!(l)
+        if token(tree) == ¬
+            if length(tree.children) == 1 && first(tree.children) isa Atom
+                push!(negated, first(tree.children).value)
+            else
+                error("Negation of non-atomic formula is not supported.")
+            end
+        elseif (token(tree) == ∧) || (token(tree) == ∨)
+            append!(l, tree.children)
+        elseif tree isa Atom
+            continue
+        else
+            error("Unknown syntax tree tree type: $(typeof(tree))")
+        end        
+    end
+    return negated
+end
+
+function get_indices_range(sizes)
+    end_indices::Vector{Int} = cumsum(sizes)
+    start_indices::Vector{Int} = end_indices .- sizes .+ 1
+    return range.(start_indices, end_indices)
+end
+
+function get_indices_dict(M, sizes)
+    keys = map(atom -> atom.value, atoms(M))
+    ranges = get_indices_range(sizes)
+    return Dict(zip(keys, ranges))
+end
+
+function get_positions_dict(M)
+    atom_from_position = Dict(enumerate(atoms(M)))
+    position_from_atom = Dict(value => key for (key, value) in atom_from_position)
+    return position_from_atom
+end
+
 struct Problem
+    M::SyntaxTree
     f::Vector{Function}
     Df::Vector{Function}
-    dnf_indices::Vector{Vector{Int}}
-    function Problem(f, Df, dnf_indices)
+    positions_dict::Dict{Atom{String}, Int}
+    function Problem(M::SyntaxTree, f, Df, positions_dict::Dict{Atom{String}, Int})
         @assert length(f) == length(Df) "Number of functions and gradients must be equal."
-        n = length(f)
-        for indices in dnf_indices
-            for idx in indices
-                @assert 1 <= idx <= n "DNF index $idx out of bounds. There are $n functions."
-            end
-        end
-        new(f, Df, dnf_indices)
+        @assert length(f) == maximum(values(positions_dict)) "Number of functions and largest position must be equal."
+        @assert allunique(atoms(M)) "All predicates in the formula must be unique."
+        @assert length(positions_dict) == natoms(M) "Number of dictionary entries must match the number of predicates in the formula."
+        new(M, f, Df, positions_dict)
     end
+    # function Problem(formula_string::String, f::Vector{Function}, Df::Vector{Function}, sizes::Vector{Int})
+    #     @assert length(f) == length(Df) "Number of functions and gradients must be equal."
+    #     @assert length(f) == sum(sizes) "Number of functions and dimensions must be equal."
+    #     M = parseformula(formula_string)
+    #     @assert allunique(atoms(M)) "All predicates in the formula must be unique."
+    #     @assert length(sizes) == natoms(M) "Number of dimensions must match the number of predicates in the formula."
+    #     indices_dict = get_indices_dict(M, sizes)
+    #     negated_predicates = get_negated_predicates(M)
+    #     new(M, f, Df, indices_dict, negated_predicates)
+    # end
 end
 
 # abstract type ConnectedProblem end
