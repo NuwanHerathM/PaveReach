@@ -171,13 +171,9 @@ end
     M = parseformula("P_1 ∧ ((P_2 ∨ P_3) ∧ P_4)")
     R = [EmptySet(1), LazySets.IntervalModule.Interval(4, 6), LazySets.IntervalModule.Interval(-100, 5), LazySets.IntervalModule.Interval(-2, 0.5)]
     positions_dict = Dict(Atom("P_1") => 1, Atom("P_2") => 2, Atom("P_3") => 3, Atom("P_4") => 4)
-    @test test_in_1(M, R, positions_dict) == false
-    @test test_out_1(M, R, positions_dict) == true
-    @test test_in_2(M, R, positions_dict) == true
-    @test test_out_2(M, R, positions_dict) == false
+    @test test_zero_in(M, R, positions_dict) == false
+    @test test_zero_not_in(M, R, positions_dict) == true
     R = [LazySets.IntervalModule.Interval(-10, 10), LazySets.IntervalModule.Interval(4, 6), LazySets.IntervalModule.Interval(-100, 5), LazySets.IntervalModule.Interval(-2, 0.5)]
-    @test test_in_1(M, R, positions_dict) == true
-    @test test_out_1(M, R, positions_dict) == false
-    @test test_in_2(M, R, positions_dict) == false
-    @test test_out_2(M, R, positions_dict) == true
+    @test test_zero_in(M, R, positions_dict) == true
+    @test test_zero_not_in(M, R, positions_dict) == false
 end

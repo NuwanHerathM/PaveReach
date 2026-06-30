@@ -471,41 +471,21 @@ function is_zero_not_in(R, i)
     return isempty(R[i]) || interval(0,0) ⊈ interval(min(R[i]), max(R[i]))
 end
 
-function test_in_1(M, R, positions_dict)
+function test_zero_in(M, R, positions_dict)
     @match M begin
         ::Atom => is_zero_in(R, positions_dict[M.value])
-        ::SyntaxBranch where (token(M) == ∧) => all(test_in_1(child, R, positions_dict) for child in M.children)
-        ::SyntaxBranch where (token(M) == ∨) => any(test_in_1(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∧) => all(test_zero_in(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∨) => any(test_zero_in(child, R, positions_dict) for child in M.children)
         ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
         _ => error("Unknown syntax tree type: $(typeof(M))")
     end
 end
 
-function test_out_1(M, R, positions_dict)
+function test_zero_not_in(M, R, positions_dict)
     @match M begin
         ::Atom => is_zero_not_in(R, positions_dict[M.value])
-        ::SyntaxBranch where (token(M) == ∧) => any(test_out_1(child, R, positions_dict) for child in M.children)
-        ::SyntaxBranch where (token(M) == ∨) => all(test_out_1(child, R, positions_dict) for child in M.children)
-        ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
-        _ => error("Unknown syntax tree type: $(typeof(M))")
-    end
-end
-
-function test_in_2(M, R, positions_dict)
-    @match M begin
-        ::Atom => is_zero_not_in(R, positions_dict[M.value])
-        ::SyntaxBranch where (token(M) == ∧) => any(test_in_2(child, R, positions_dict) for child in M.children)
-        ::SyntaxBranch where (token(M) == ∨) => all(test_in_2(child, R, positions_dict) for child in M.children)
-        ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
-        _ => error("Unknown syntax tree type: $(typeof(M))")
-    end
-end
-
-function test_out_2(M, R, positions_dict)
-    @match M begin
-        ::Atom => is_zero_in(R, positions_dict[M.value])
-        ::SyntaxBranch where (token(M) == ∧) => all(test_out_2(child, R, positions_dict) for child in M.children)
-        ::SyntaxBranch where (token(M) == ∨) => any(test_out_2(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∧) => any(test_zero_not_in(child, R, positions_dict) for child in M.children)
+        ::SyntaxBranch where (token(M) == ∨) => all(test_zero_not_in(child, R, positions_dict) for child in M.children)
         ::SyntaxBranch where (token(M) == ¬) => error("The formula should not contain negations at this point. Negations should have been expanded.")
         _ => error("Unknown syntax tree type: $(typeof(M))")
     end
@@ -520,7 +500,7 @@ function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         problem = qcp.problem
         # G = last(intervals, qcp.n)
         R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
-        return test_in_1(problem.M, R_inner, problem.positions_dict)
+        return test_zero_in(problem.M, R_inner, problem.positions_dict)
     end
 end
 
@@ -534,7 +514,7 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         # G_minus = [interval(-∞, intervals[end-i].lo) ∩ f_bounds[end-i] for i in (qcp.n-1):-1:0]
         # G = last(intervals, qcp.n)
         R_outer = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
-        return test_in_2(problem.M, R_outer, problem.positions_dict) 
+        return test_zero_not_in(problem.M, R_outer, problem.positions_dict) 
     end
 end
 
@@ -546,7 +526,7 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         problem = qcp.problem
         R_outer = QEapprox_o0_outer(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
-        return test_out_1(problem.M, R_outer, problem.positions_dict)
+        return test_zero_not_in(problem.M, R_outer, problem.positions_dict)
     end
 end
 
@@ -560,7 +540,7 @@ function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         # G_complement = complement_disjunction(last(intervals, qcp.n), problem.dnf_indices)
         # G = last(intervals, qcp.n)
         R_inner = QEapprox_o0_inner(problem.f, problem.Df, dirty_quantifiers, dirty_qs, qcp.p, qcp.n, [X.v..., intervals...])
-        return test_out_2(problem.M, R_inner, problem.positions_dict)
+        return test_zero_in(problem.M, R_inner, problem.positions_dict)
     end
 end
 
