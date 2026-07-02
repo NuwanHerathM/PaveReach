@@ -43,10 +43,10 @@ end
 
 @testset "Slices according to optimization" begin
     a = interval(0, 5)
-    @test backward(a, -1) == 5
-    @test forward(a, -1) == 0
-    @test backward(a, 1) == 0
-    @test forward(a, 1) == 5
+    @test backward_bound(a, -1) == 5
+    @test forward_bound(a, -1) == 0
+    @test backward_bound(a, 1) == 0
+    @test forward_bound(a, 1) == 5
     optimization_directions = [-1, 1]
     @test backward_slices(box, optimization_directions, nothing) == [IntervalBox(interval(2, 2), interval(40, 50)), IntervalBox(interval(0, 2), interval(40, 40))]
     @test forward_slices(box, optimization_directions, nothing) == [IntervalBox(interval(0, 0), interval(40, 50)), IntervalBox(interval(0, 2), interval(50, 50))]
@@ -78,7 +78,7 @@ end
     M = parseformula("(¬ P_1 ∧ P_2) ∨ P_3")
     intervals = [interval(-5, 5), interval(-5, 5), interval(minus_inf, 8), interval(3, plus_inf), interval(0, 10), interval(1, 2)]
     sizes = [2, 3, 1]
-    indices_dict = get_indices_dict(M, sizes)
+    indices_dict = build_ranges_dict(M, sizes)
     @test expand_1(M, indices_dict, intervals) == parseformula("(((P_1_1_1 ∨ P_1_1_2) ∨ (P_1_2_1 ∨ P_1_2_2)) ∧ (P_2_1 ∧ P_2_2 ∧ P_2_3)) ∨ P_3")
     @test expand_2(M, indices_dict, intervals) == parseformula("((P_1_1 ∧ P_1_2) ∨ (P_2_1 ∨ P_2_2 ∨ (P_2_3_1 ∨ P_2_3_2))) ∧ (P_3_1 ∨ P_3_2)")
     M = parseformula("P_1 ∧ ¬ (P_2 ∨ P_3)")
@@ -90,7 +90,7 @@ end
 #     M = parseformula("P_1")
 #     intervals = [interval(0, 6)]
 #     sizes = [1]
-#     indices_dict = get_indices_dict(M, sizes)
+#     indices_dict = build_ranges_dict(M, sizes)
 #     @test expand_negations_in_1(M, indices_dict, intervals) == parseformula("P_1")
 #     @test expand_negations_out_1(M, indices_dict, intervals) == parseformula("P_1")
 #     @test expand_negations_in_2(M, indices_dict, intervals) == parseformula("P_1_1 ∨ P_1_2")
@@ -98,7 +98,7 @@ end
 #     M = parseformula("¬ P_1")
 #     intervals = [interval(0, 6)]
 #     sizes = [1]la
-#     indices_dict = get_indices_dict(M, sizes)
+#     indices_dict = build_ranges_dict(M, sizes)
 #     @test expand_negations_in_1(M, indices_dict, intervals) == parseformula("P_1_1 ∨ P_1_2")
 #     @test expand_negations_out_1(M, indices_dict, intervals) == parseformula("P_1_1 ∨ P_1_2")
 #     @test expand_negations_in_2(M, indices_dict, intervals) == parseformula("P_1")
@@ -106,7 +106,7 @@ end
 #     M = parseformula("P_1 ∨ (¬ P_2 ∧ ¬ P_3) ∧ (P_4 ∨ P_5) ∧ ¬ P_6")
 #     intervals = [interval(-5, 5), interval(-5, 5), interval(minus_inf, 8), interval(3, plus_inf), interval(0, 10), interval(1, 2)]
 #     sizes = repeat([1], 6)
-#     indices_dict = get_indices_dict(M, sizes)
+#     indices_dict = build_ranges_dict(M, sizes)
 #     @test expand_negations_in_1(M, indices_dict, intervals) == parseformula("P_1 ∨ ((P_2_1 ∨ P_2_2) ∧ P_3) ∧ (P_4 ∨ P_5) ∧ (P_6_1 ∨ P_6_2)")
 #     @test expand_negations_out_1(M, indices_dict, intervals) == parseformula("P_1 ∨ ((P_2_1 ∨ P_2_2) ∧ P_3) ∧ (P_4 ∨ P_5) ∧ (P_6_1 ∨ P_6_2)")
 #     @test expand_negations_in_2(M, indices_dict, intervals) == parseformula("(P_1_1 ∨ P_1_2) ∧ ((P_2 ∨ P_3) ∨ (P_4 ∧ (P_5_1 ∨ P_5_2)) ∨ P_6)")
@@ -118,7 +118,7 @@ end
         M = parseformula("P_1 ∨ (¬ P_2 ∧ ¬ P_3) ∧ (P_4 ∨ P_5) ∧ ¬ P_6")
         intervals = [interval(-5, 5), interval(-5, 5), interval(minus_inf, 8), interval(3, plus_inf), interval(0, 10), interval(1, 2)]
         sizes = repeat([1], 6)
-        indices_dict = get_indices_dict(M, sizes)
+        indices_dict = build_ranges_dict(M, sizes)
         @testset "Duplication positions" begin
             @test issetequal(duplication_positions_1(M, indices_dict, intervals), [2, 6])
             @test issetequal(duplication_positions_2(M, indices_dict, intervals), [1, 5])
@@ -132,7 +132,7 @@ end
         M = parseformula("(¬ P_1 ∧ P_2) ∨ P_3")
         intervals = [interval(-5, 5), interval(-5, 5), interval(minus_inf, 8), interval(3, plus_inf), interval(0, 10), interval(1, 2)]
         sizes = [2, 3, 1]
-        indices_dict = get_indices_dict(M, sizes)
+        indices_dict = build_ranges_dict(M, sizes)
         @testset "Duplication positions" begin
             @test issetequal(duplication_positions_1(M, indices_dict, intervals), [1, 2])
             @test issetequal(duplication_positions_2(M, indices_dict, intervals), [5, 6])

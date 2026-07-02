@@ -205,6 +205,7 @@ For `PaveReach`
 * `BenchmarkTools` v1.6.3
 * `Luxor` v4.3.0
 * `MathTeXEngine` v0.6.7
+* `ReusePatterns` v0.3.1
 
 #### Adding a package
 
@@ -223,7 +224,7 @@ pkg> add <name_of_the_package> [@<version>]
 ```
 Or add all the packages at once.
 ```julia
-pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7
+pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7 ReusePatterns @0.3.1
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
 
@@ -475,3 +476,7 @@ luxor_draw(X_0, inn, out, delta, width, height, buffer)
 finish()
 println("The result was saved in $(outfile).")
 ```
+
+## Formula
+
+> Note: in Julia `:∧` as precedence over `:∨`. It can be checked by the built-in function `Base.operator_precedence`.

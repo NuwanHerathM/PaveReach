@@ -3,27 +3,29 @@ include("../src/pave.jl")
 using BenchmarkTools
 
 # ------------------------------------------------------
-using ArgParse
+# using ArgParse
 
-function parse_commandline()
-    s = ArgParseSettings()
+# function parse_commandline()
+#     s = ArgParseSettings()
 
-    @add_arg_table s begin
-        "--with_plots"
-            help = "generate the output with Plots.jl"
-            action = :store_true
-        "--with_luxor"
-            help = "generate the output with Luxor.jl"
-            action = :store_true
-    end
+#     @add_arg_table s begin
+#         "--with_plots"
+#             help = "generate the output with Plots.jl"
+#             action = :store_true
+#         "--with_luxor"
+#             help = "generate the output with Luxor.jl"
+#             action = :store_true
+#     end
 
-    return parse_args(s)
-end
+#     return parse_args(s)
+# end
 
-parsed_args = parse_commandline()
+# parsed_args = parse_commandline()
 # ------------------------------------------------------
-use_plots = parsed_args["with_plots"]
-use_luxor = parsed_args["with_luxor"]
+# use_plots = parsed_args["with_plots"]
+# use_luxor = parsed_args["with_luxor"]
+use_plots = false
+use_luxor = true
 
 @assert nand(use_plots, use_luxor) "Plots and Luxor are mutually exclusive. Use --help for more information."
 # ------------------------------------------------------
@@ -31,17 +33,28 @@ use_luxor = parsed_args["with_luxor"]
 filename = splitext(PROGRAM_FILE)[1]
 
 n = 1
-p = 3
+p = 2
 @variables x[1:p]
-f_num = [x[1]^2 + x[2]^2 - x[3]]
+f_num = [x[1]^2 + x[2]^2]
 f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-problem = Problem(f_fun, Df_fun, [[1]])
+sizes = [1]
+problem = Problem("¬ P_1", f_fun, Df_fun, sizes)
+# problem = Problem("P_1", f_fun, Df_fun, sizes)
+# n = 2
+# p = 2
+# @variables x[1:p]
+# f_num = [x[1]^2 + x[2]^2, x[1]^2 + x[2]^2]
+# f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
+# sizes = [1, 1]
+# problem = Problem("P_1_1 ∨ P_1_2", f_fun, Df_fun, sizes)
 qvs = []
 qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
 X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
 p_in = []
 p_out = deepcopy(p_in)
 G = [interval(0, 16)]
+# G = [interval(16, plus_inf)]
+# G = [interval(minus_inf, 0), interval(16, plus_inf)]
 
 ϵ_x = 0.1
 ϵ_p = 0.5
@@ -60,7 +73,7 @@ println("ϵ_p  = ", ϵ_p)
 println(if allow_exists_and_forall_bisection "Refined" else "Not refined" end)
 println(if allow_exists_or_forall_bisection "Normal bisection on P" else "No standard bisection on P" end)
 
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
+@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, x, sizes, f_num, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 if allow_exists_and_forall_bisection
