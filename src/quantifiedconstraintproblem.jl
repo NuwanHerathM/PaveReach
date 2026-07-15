@@ -65,24 +65,51 @@ function build_positions_dict(M::SyntaxTree)
     return position_from_atom
 end
 
+SymbolicFunction = Num
+
+struct UserDefinedFunctions
+    f::Vector{Function}
+    Df::Vector{Function}
+end
+
+get_f(userfunctions::UserDefinedFunctions) = userfunctions.f
+get_Df(userfunctions::UserDefinedFunctions) = userfunctions.Df
+
+struct UserDefinedSymbolicFunctions
+    variables::AbstractVector{Num}
+    f_num::Vector{Num}
+end
+
+get_variables(userfunctions::UserDefinedSymbolicFunctions) = userfunctions.variables
+get_f_num(userfunctions::UserDefinedSymbolicFunctions) = userfunctions.f_num
+
 struct ProblemParameters
     M::SyntaxTree
-    f_num::Vector{Num}
+    f::Union{UserDefinedFunctions, UserDefinedSymbolicFunctions}
     sizes::Vector{Int}
     qvs::Vector{QuantifiedVariable}
     qvs_relaxed::Vector{Vector{QuantifiedVariable}}
     n::Int
     p::Int
-    function ProblemParameters(M::SyntaxTree, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+    function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
         n = length(f_num)
         @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to number of functions."
         @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
-        new(M, f_num, sizes, qvs, qvs_relaxed, n, p)
+        userfunctions = UserDefinedSymbolicFunctions(variables, f_num)
+        new(M, userfunctions, sizes, qvs, qvs_relaxed, n, p)
+    end
+    function ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::Vector{Function}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+        n = length(f)
+        @assert length(Df) == n "Number of functions and gradients must be equal."
+        @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to number of functions."
+        @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
+        userfunctions = UserDefinedFunctions(f, Df)
+        new(M, userfunctions, sizes, qvs, qvs_relaxed, n, p)
     end
 end
 
 get_M(parameters::ProblemParameters) = parameters.M
-get_f_num(parameters::ProblemParameters) = parameters.f_num
+get_f(parameters::ProblemParameters) = parameters.f
 get_qvs(parameters::ProblemParameters) = parameters.qvs
 get_qvs_relaxed(parameters::ProblemParameters) = parameters.qvs_relaxed
 get_sizes(parameters::ProblemParameters) = parameters.sizes

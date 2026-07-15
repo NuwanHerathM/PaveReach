@@ -45,7 +45,7 @@ end
 
 filename = splitext(PROGRAM_FILE)[1]
 
-nnet = read_onnx_mlp("normed_etcs_2x250_nodes.onnx")
+nnet = read_onnx_mlp("models/normed_etcs_2x250_nodes.onnx")
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 

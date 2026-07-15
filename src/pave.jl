@@ -1,6 +1,7 @@
 using Plots
 using Luxor
 using MathTeXEngine
+using LinearAlgebra
 
 include("genreach2.jl")
 include("quantifiedconstraintproblem.jl")
@@ -575,11 +576,11 @@ global z_in, z_out
 const expansion_functions_1 = (expand_1, duplication_positions_1, complement_ranges_1)
 const expansion_functions_2 = (expand_2, duplication_positions_2, complement_ranges_2)
 
-function build_quantified_problem_in(parameters::ProblemParameters, domains, variables, criterion)
+function build_quantified_problem_in(parameters::ProblemParameters, domains, criterion)
     expand, duplication_positions, complement_ranges = criterion == 1 ? expansion_functions_1 : expansion_functions_2 
     
     M = get_M(parameters)
-    f_num = get_f_num(parameters)
+    userfunctions = get_f(parameters)
     qvs = get_qvs(parameters)
     qvs_relaxed = get_qvs_relaxed(parameters)
     sizes = get_sizes(parameters)
@@ -593,12 +594,30 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, var
     M_in = expand(M, ranges_dict, G)
     positions_in = duplication_positions(M, ranges_dict, G)
     Δn_in = length(positions_in)
-    @variables z_in[n + Δn_in]
-    f_num_in = inflate(f_num, positions_in)
-    for i in 1:(n + Δn_in)
-        f_num_in[i] -= z_in[i]
+    if userfunctions isa UserDefinedSymbolicFunctions
+        variables = get_variables(userfunctions)
+        f_num = get_f_num(userfunctions)
+        @variables z_in[n + Δn_in]
+        f_num_in = inflate(f_num, positions_in)
+        for i in 1:(n + Δn_in)
+            f_num_in[i] -= z_in[i]
+        end
+        f_fun_in, Df_fun_in = build_function_f_Df(f_num_in, [variables..., z_in...], n + Δn_in, p + n + Δn_in)
+    elseif userfunctions isa UserDefinedFunctions
+        f_inflated = inflate(get_f(userfunctions), positions_in)
+        Df_inflated = inflate(get_Df(userfunctions), positions_in)
+        f_fun_in = Function[]
+        Df_fun_in = Function[]
+        Dz = Matrix{Float64}(-LinearAlgebra.I, n + Δn_in, n + Δn_in)
+        for i in 1:(n + Δn_in)
+            f_fun_in_i = x -> f_inflated[i](x[1:p]) - x[p+i]
+            push!(f_fun_in, f_fun_in_i)
+            Df_fun_in_i = x -> [Df_inflated[i](x[1:p])..., Dz[i,:]...]
+            push!(Df_fun_in, Df_fun_in_i)
+        end
+    else
+        error("Unknown type of user-defined functions: $(typeof(userfunctions)).")
     end
-    f_fun_in, Df_fun_in = build_function_f_Df(f_num_in, [variables..., z_in...], n + Δn_in, p + n + Δn_in)
     G_in = expand_intervals(G, complement_ranges(M, ranges_dict))
     qvs_relaxed_in = inflate(qvs_relaxed, positions_in)
     positions_dict_in = build_positions_dict(M_in)
@@ -607,11 +626,11 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, var
     return QuantifiedConstraintProblem(problem_in, qvs, qvs_relaxed_in, p + n + Δn_in, n + Δn_in)
 end
 
-function build_quantified_problem_out(parameters::ProblemParameters, domains, variables, criterion)
+function build_quantified_problem_out(parameters::ProblemParameters, domains, criterion)
     expand, duplication_positions, complement_ranges = criterion == 1 ? expansion_functions_1 : expansion_functions_2 
     
     M = get_M(parameters)
-    f_num = get_f_num(parameters)
+    userfunctions = get_f(parameters)
     qvs = get_qvs(parameters)
     qvs_relaxed = get_qvs_relaxed(parameters)
     sizes = get_sizes(parameters)
@@ -625,12 +644,30 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, va
     M_out = expand(M, ranges_dict, G)
     positions_out = duplication_positions(M, ranges_dict, G)
     Δn_out = length(positions_out)
-    @variables z_out[n + Δn_out]
-    f_num_out = inflate(f_num, positions_out)
-    for i in 1:(n + Δn_out)
-        f_num_out[i] -= z_out[i]
+    if userfunctions isa UserDefinedSymbolicFunctions
+        variables = get_variables(userfunctions)
+        f_num = get_f_num(userfunctions)
+        @variables z_out[n + Δn_out]
+        f_num_out = inflate(f_num, positions_out)
+        for i in 1:(n + Δn_out)
+            f_num_out[i] -= z_out[i]
+        end
+        f_fun_out, Df_fun_out = build_function_f_Df(f_num_out, [variables..., z_out...], n + Δn_out, p + n + Δn_out)
+    elseif userfunctions isa UserDefinedFunctions
+        f_inflated = inflate(get_f(userfunctions), positions_out)
+        Df_inflated = inflate(get_Df(userfunctions), positions_out)
+        f_fun_out = Function[]
+        Df_fun_out = Function[]
+        Dz = Matrix{Float64}(-LinearAlgebra.I, n + Δn_out, n + Δn_out)
+        for i in 1:(n + Δn_out)
+            f_fun_out_i = x -> f_inflated[i](x[1:p]) - x[p+i]
+            push!(f_fun_out, f_fun_out_i)
+            Df_fun_out_i = x -> [Df_inflated[i](x[1:p])..., Dz[i,:]...]
+            push!(Df_fun_out, Df_fun_out_i)
+        end
+    else
+        error("Unknown type of user-defined functions: $(typeof(userfunctions)).")
     end
-    f_fun_out, Df_fun_out = build_function_f_Df(f_num_out, [variables..., z_out...], n + Δn_out, p + n + Δn_out)
     G_out = expand_intervals(G, complement_ranges(M, ranges_dict))
     qvs_relaxed_out = inflate(qvs_relaxed, positions_out)
     positions_dict_out = build_positions_dict(M_out)
@@ -639,18 +676,25 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, va
     return QuantifiedConstraintProblem(problem_out, qvs, qvs_relaxed_out, p + n + Δn_out, n + Δn_out)
 end
 
+Precision = Union{T, Vector{T}} where T<:Number
+
 struct PavingConfiguration
-    ϵ_x::AbstractFloat
-    ϵ_p::Union{AbstractFloat, Nothing}
+    ϵ_x::Precision
+    ϵ_p::Union{Precision, Nothing}
     allow_exists_or_forall_bisection::Bool
     allow_exists_and_forall_bisection::Bool
-    function PavingConfiguration(ϵ_x::AbstractFloat)
+    function PavingConfiguration(ϵ_x::Precision)
         new(ϵ_x, nothing, false, false)
     end
-    function PavingConfiguration(ϵ_x::AbstractFloat, ϵ_p::AbstractFloat, allow_exists_or_forall_bisection::Bool, allow_exists_and_forall_bisection::Bool)
+    function PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, allow_exists_or_forall_bisection::Bool, allow_exists_and_forall_bisection::Bool)
         @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive."
         @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
         new(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
+    end
+    function PavingConfiguration(ϵ_x::Precision, ϵ_p::Nothing, allow_exists_or_forall_bisection::Bool, allow_exists_and_forall_bisection::Bool)
+        @assert !allow_exists_or_forall_bisection "ϵ_p must be provided when subdivision on parameter space is allowed."
+        @assert !allow_exists_and_forall_bisection "ϵ_p must be provided when refinement on parameter space is allowed."
+        new(ϵ_x, nothing, false, false)
     end
 end
 
@@ -670,7 +714,7 @@ function Base.show(io::IO, configuration::PavingConfiguration)
     print(io, if configuration.allow_exists_or_forall_bisection "Normal bisection on P" else "No standard bisection on P" end)
 end
 
-function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, variables, configuration, criterion_in, criterion_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, configuration, criterion_in, criterion_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
     X_length = length(X)
     P_length = length(get_P(domains))
     @assert X_length + P_length == get_p(parameters) "Total number of variables, in X and p_in, must be equal to p = $(get_p(parameters))."
@@ -690,8 +734,8 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, vari
     n = get_n(parameters)
     p = get_p(parameters)
     
-    qcp_in = build_quantified_problem_in(parameters, domains, variables, criterion_in)
-    qcp_out = build_quantified_problem_out(parameters, domains, variables, criterion_out)
+    qcp_in = build_quantified_problem_in(parameters, domains, criterion_in)
+    qcp_out = build_quantified_problem_out(parameters, domains, criterion_out)
     
     P = get_P(domains)
     P_in = [[interval] for interval in P]
@@ -819,10 +863,10 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, vari
     return inn, out, delta
 end
 
-pave_11(X, parameters, domains, variables, configuration) = pave(X, parameters, domains, variables, configuration, 1, 1)
-pave_12(X, parameters, domains, variables, configuration) = pave(X, parameters, domains, variables, configuration, 1, 2)
-pave_21(X, parameters, domains, variables, configuration) = pave(X, parameters, domains, variables, configuration, 2, 1)
-pave_22(X, parameters, domains, variables, configuration) = pave(X, parameters, domains, variables, configuration, 2, 2)
+pave_11(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 1, 1)
+pave_12(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 1, 2)
+pave_21(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 2, 1)
+pave_22(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 2, 2)
 
 function bisection_slice(box, ϵ)
     diams = IntervalArithmetic.diam.(box)
