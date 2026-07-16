@@ -91,6 +91,12 @@ struct ProblemParameters
     qvs_relaxed::Vector{Vector{QuantifiedVariable}}
     n::Int
     p::Int
+    function ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+        n = length(f_num)
+        M = parseformula("P")
+        sizes = [n]
+        ProblemParameters(M, variables, f_num, sizes, qvs, qvs_relaxed, p)
+    end
     function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
         n = length(f_num)
         @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to number of functions."

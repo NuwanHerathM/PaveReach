@@ -23,7 +23,7 @@ For a quantified set $\Sigma$, the paving function `paving_11` returns
 
 For the different paving functions, see [Oracles](#oracles).
 
-## Reusing the artifact
+## Using the prototype
 ### Dependencies
 
 `PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)). In the present prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
@@ -43,6 +43,7 @@ For `PaveReach`
 * `BenchmarkTools` v1.6.3
 * `Luxor` v4.3.0
 * `MathTeXEngine` v0.6.7
+* `SoleLogics` v0.13.7
 * `ReusePatterns` v0.3.1
 * `Pandas` v1.6.1
 
@@ -63,7 +64,7 @@ pkg> add <name_of_the_package> [@<version>]
 ```
 Or add all the packages at once.
 ```julia
-pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7 ReusePatterns @0.3.1 Pandas@1.6.1
+pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7 SoleLogics @0.13.7 ReusePatterns @0.3.1 Pandas @1.6.1
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
 
@@ -334,6 +335,19 @@ luxor_draw(X_0, inn, out, delta, width, height, buffer)
 finish()
 println("The result was saved in $(outfile).")
 ``` -->
+
+## Problem parameters
+
+There are three ways to define the parameters of the problem.
+```julia
+ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+```
+```julia
+ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+```
+```julia
+ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::Vector{Function}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+```
 
 ## Formula
 

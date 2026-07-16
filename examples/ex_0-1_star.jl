@@ -18,6 +18,7 @@ qvs = QuantifiedVariable[]                                                      
 qvs_relaxed = [qvs, qvs, qvs, qvs]
 # 
 parameters = ProblemParameters(formula, x, f_num, sizes, qvs, qvs_relaxed, p)
+parameters = ProblemParameters(x, f_num, qvs, qvs_relaxed, p)
 X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))                                             # X_0 = [-5, 5] x [-5, 5]
 P = IntervalArithmetic.Interval{Float64}[]                                                      # No parameters in this example
 G = [interval(minus_inf, 4),                                                                    # f_1(x, y) <= 4 that is f_1(x, y) ∈ (-∞, 4]
