@@ -127,60 +127,6 @@ function complement(x::IntervalArithmetic.Interval{T}) where T <: Number
     return l
 end
 
-struct Component
-    interval::IntervalArithmetic.Interval
-    index::Int
-end
-
-function complement_conjunction_components(G::Vector{IntervalArithmetic.Interval{T}}, conjunction_indices::Vector{Int}) where T <: Number
-    l = []
-    for (i, index) in enumerate(conjunction_indices)
-        compl_G_i = complement(G[index])
-        for sub_compl_G_i in compl_G_i
-            sub_region = [Component(interval(minus_inf, plus_inf), j) for j in conjunction_indices]
-            sub_region[i] = Component(sub_compl_G_i, index)
-            push!(l, sub_region)
-        end
-    end
-    return l
-end
-
-function complement_disjunction(G::Vector{IntervalArithmetic.Interval{T}}, dnf_indices::Vector{Vector{Int}}) where T <: Number
-    conjunctions = []
-    for conjunction_indices in dnf_indices
-        compl = complement_conjunction_components(G, conjunction_indices)
-        push!(conjunctions, compl)
-    end
-
-    n = length(G)
-    conjunction_product = collect(Iterators.product(conjunctions...))
-    disjunction = []
-    for components in conjunction_product
-        comp = reduce(vcat, components)
-        filtered_intervals = []
-        for i in 1:n
-            ith_intervals = [c.interval for c in comp if c.index == i]
-            ith_interval =  reduce(intersect, ith_intervals; init=interval(minus_inf, plus_inf))
-            push!(filtered_intervals, ith_interval)
-        end
-        push!(disjunction, filtered_intervals)
-    end
-    return disjunction
-end
-
-function disjunction(G::Vector{IntervalArithmetic.Interval{T}}, dnf_indices::Vector{Vector{Int}}) where T <: Number
-    n = length(G)
-    disjunction = []
-    for conjunction_indices in dnf_indices
-        sub_region = repeat([interval(minus_inf, plus_inf)], n)
-        for i in conjunction_indices
-            sub_region[i] = G[i]
-        end
-        push!(disjunction, sub_region)
-    end
-    return disjunction
-end
-
 "Custom version of isbounded to handle pseudo_infinity values."
 function is_bounded(interval::IntervalArithmetic.Interval{T}) where T <: Number
     return !isempty(interval) && interval.lo != minus_inf && interval.hi != plus_inf

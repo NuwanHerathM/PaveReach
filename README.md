@@ -6,17 +6,15 @@ Paving of a set describing a quantified constraint problem, using general reacha
   <img src="images/ex_5-4_circle_collision_11_0.1_0.1_refined.png" width="300">
 </p>
 
-We refer here to sections, figures and tables of the paper that uses this artifact.
-
 ## Gist of the program
 
 ```julia
 include("pave.jl")
 ...
-inn, out, delta = paving_11(...)
+inn, out, delta = pave_11(...)
 ```
 
-For a quantified set $\Sigma$, the paving function `paving_11` returns
+For a quantified set $\Sigma$, the paving function `pave_11` returns
 - the inside $\Sigma^-$ in  `inn`,
 - the outside $(\Sigma^\complement)^-$ in `out`,
 - and the potential boundary $\Sigma^\Delta$ in `delta`.
@@ -200,53 +198,44 @@ optional arguments:
   --with_luxor     generate the output with Luxor.jl
   -h, --help       show this help message and exit
 ```
+-->
 
 ### Quantified constraint problem
 
 #### General case
 
-The `QuantifiedConstraintProblem` type aggregates the information needed to compute the reachability with `GenReach`.
+Required information is aggregated into `ProblemParameters` and `ProblemDomains`.
 ```julia
-n = 2
+p = 2
+@variables x[1:p]
 ...
-# problem := f, Df
-problem = Problem(f_fun, Df_fun)
+# f
+f_num = ...
+# Formula
+formula = ...
+sizes = ...
 # Quantified variables
 qvs = ...
 # Relaxed quantified variables
 qvs_relaxed_1 = ...
 qvs_relaxed_2 = ...
-# Quantifier elimination problem
-qcp = QuantifiedConstraintProblem(problem, qvs, [qvs_relaxed_1, qvs_relaxed_2], p, n)
+# Problem parameters
+parameters = ProblemParameters(formula, x, f_num, sizes, qvs, [qvs_relaxed_1, qvs_relaxed_2], p)
+# Problem domains
+P = ...
+G = ...
+domains = ProblemDomains(P, G)
 ```
-See the examples for further details.
+See the examples and [Problem parameters](#problem-parameters) for further details.
 
 #### For a scalar-valued function
 
 For scalar-valued functions, one simply needs to do
 ```julia
-n = 1
-...
-# Quantifier elimination problem
-qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
+# Problem parameters
+parameters = ProblemParameters(formula, x, f_num, sizes, qvs, [qvs], p)
 ```
 In this case, `qvs` is just repeated between `[` and `]`.
-
-#### `Problem`
-
-A `Problem` is constructed from a function `f_fun` and the function which computes its Jacobian `Df_fun`.
-```julia
-# problem := f, Df
-problem = Problem(f_fun, Df_fun)
-```
-There is a utility function `build_function_f_Df` which builds both functions, `f_fun` and `Df_fun`, from the expression of the function.
-```julia
-n = ...
-p = ...
-@variables x[1:p]
-f_num = [...]
-f_fun, Df_fun = build_function_f_Df(f_num, x, n, p)
-```
 
 #### Quantified variables
 
@@ -256,43 +245,120 @@ qv_1 = (Forall, 1)
 qv_2 = (Exists, 5)
 ```
 
-In the definition of the problem, the first quantified variables are reserved for the free variables. The last `n` ones are reserved for the components of $\mathbb{G} \subseteq \mathbb{R}^n$. One has to specify the quantifiers for $\mathbb{P}$. They can be numbered with the remaining values.
+In the definition of the problem, the first quantified variables are reserved for the free variables. One has to specify the quantifiers for $\mathbb{P}$. They can be numbered with the remaining values in $[1, p]$.
 
-For example, in `ex_5-4_circle_collision.jl` the problem is
+For example, let us take a look at the following problem:
+<!-- in `ex_5-4_circle_collision.jl` the problem is -->
 $$\{(x, y) \in [-5, 5]^2 \, | \, \forall t \in [-\pi, \pi],(2.5*sin(t) - x)^2 + (2.5*cos(t) - y)^2 \in [0.25, +\infty]\}$$
 
-Even though the total number of variable is `p=4`, one only has to specify the quantifier for the third variable
+Even though the total number of variable is `p=3`, one only has to specify the quantifier for the third variable
 ```julia
-# x[1] := x, x[2] := y, x[3] := t, x[4] := d
+# x[1] := x, x[2] := y, x[3] := t
 qvs = [(Forall, 3)]
 ```
 
-The first two variables correspond to the free variables, $x$ and $y$, of the 2D problem and the last one is $d \in \mathbb{G}$ (`n=1`). Their quantifiers are handled by the algorithm.
+The first two variables correspond to the free variables, $x$ and $y$, of the 2D problem. Their quantifiers are handled by the algorithm.
 
 ### Oracles
 
 Select one of the four paving functions according to this table
 
-|   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $\mathbb{G}$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$
+|   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $M$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\neg M$
 |---|---|---
-| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $\mathbb{G}$                  | `pave_11` | `pave_12`
-| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\mathbb{G}^\complement$ | `pave_21` | `pave_22`
+| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $M$                  | `pave_11` | `pave_12`
+| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\neg M$ | `pave_21` | `pave_22`
 
-> Note: the user does not have to construct $\neg\mathbb{P}$ or $\mathbb{G}^\complement$. The four paving functions take $\mathbb{P}$ and $\mathbb{G}$ as input, so swapping between the functions amounts only to changing the name of the function.
+> [!NOTE]
+> The user does not have to construct $\neg\mathbb{P}$ or $\neg M$. The four paving functions take $\mathbb{P}$ and $M$ as input, so swapping between the functions amounts only to changing the name of the function.
 
-## Parameter subdivision
+The oracles rely on the computation of a reachable set. The implementation uses the inner and outer approximations. Inner approximation requires quantifier relaxation. If you are unfamiliar with this, use `pave_21` and for the relaxed quantifiers, repeat the original quantifiers as in `examples/ex_0-1_star.jl`.
+
+## Symbolic expression of the functions
+
+We use the package `Symbolics` to handle symbolic expressions.
+
+Symbolic variables are defined via the `@variables` macro. They are then used to form the symbolic expressions of the functions.
+
+Variables can have different names.
+```julia
+@variables x, y, z
+f_num = x^2 + y^2 - z
+```
+Variables can also be arrays.
+```julia
+@variables x[1:3]
+f_num = x[1]^2 + x[2]^2 - x[3]
+```
+
+More information on the `@variables` macro can be found [here](https://symbolics.juliasymbolics.org/stable/manual/variables/#Symbolics.@variables).
+
+> [!CAUTION]
+> `z_in` and `z_out` are global variables already used by `PaveReach`.
+
+## Problem
+
+We characterize the set
+$$
+  \Sigma = \{ x \in \mathbb{D} \mid \forall p_1 \in \mathbb{P}_1, \exists p_2 \in \mathbb{P}_2, \dots, \forall p_{2l-1} \in \mathbb{P}_{2l-1}, \exists p_{2l} \in \mathbb{P}_{2l}, M(x, p) \}
+$$
+where, for predicates $P(x, p)$ defined as
+$$
+  P(x, p) := f(x, p) \in \mathbb{G},
+$$
+we have a quantifier free first order logic formula $M(x, p)$ such that
+$$
+  M(x, p) := P(x, p) \mid M(x, p) \wedge M(x, p) \mid M(x, p) \vee M(x, p) \mid \neg M(x, p).
+$$
+
+### Problem parameters
+
+We assume that the user knows how to use relaxed quantifiers for the computation of an inner reachable set. The unfamiliar user is invited to refer to [Oracles](#oracles) and use `pave_21`.
+
+There are three ways to define the parameters of the problem.
+* When there is only one predicate and you have the symbolic expression of the functions:
+`ProblemParameters` takes the variables `variables`, the symbolic expression of the functions `f_num`, the quantifiers `qvs` for the bounded variables, the relaxed variables `qvs_relaxed` and the number of variables `p`.
+```julia
+ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+```
+* When you have the symbolic expressions of the functions:
+`ProblemParameters` takes the formula `M`, the variables `variables`, the symbolic expression of the functions `f_num`, the dimensions of the codomains `sizes`, the quantifiers `qvs` for the bounded variables, the relaxed variables `qvs_relaxed` and the number of variables `p`.
+```julia
+ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+```
+* When you have the functions and their gradients:
+`ProblemParameters` takes the formula `M`, the functions `f`, the Jacobian `Df`, the dimensions of the codomains `sizes`, the quantifiers `qvs` for the bounded variables, the relaxed variables `qvs_relaxed` and the number of variables `p`.
+```julia
+ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::Vector{Function}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+```
+
+### Problem domains
+
+`ProblemDomains` takes the parameter domain $\mathbb{P}$ and the target domain $\mathbb{G}$.
+```julia
+ProblemDomains(P::Vector{IntervalArithmetic.Interval{T}}, G::Vector{IntervalArithmetic.Interval{T}})
+```
+
+## Formula
+
+> [!NOTE]
+> In Julia the conjunction operator `:∧` as precedence over the disjunction operator `:∨`. This can be checked with the built-in function `Base.operator_precedence`.
+
+## Configuring the paving
+
+The `Precision` type refers to a number or a vector of numbers.
 
 No parameter subdivision:
 ```julia
-inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, nothing, false, false)
+PavingConfiguration(ϵ_x::Precision)
+PavingConfiguration(ϵ_x::Precision, nothing, false, false)
 ```
-Subdivision as in Section 4.1:
+Subdivision:
 ```julia
-inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, false, true)
+PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, true, false)
 ```
-Points/subdivision as in Section 4.2:
+Points/subdivision:
 ```julia
-inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, true, false)
+PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, false, true)
 ```
 
 ## Saving the output
@@ -334,21 +400,4 @@ Drawing(width + 2*buffer, height + 2*buffer, outfile)
 luxor_draw(X_0, inn, out, delta, width, height, buffer)
 finish()
 println("The result was saved in $(outfile).")
-``` -->
-
-## Problem parameters
-
-There are three ways to define the parameters of the problem.
-```julia
-ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
 ```
-```julia
-ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
-```
-```julia
-ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::Vector{Function}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
-```
-
-## Formula
-
-> Note: in Julia `:∧` as precedence over `:∨`. It can be checked by the built-in function `Base.operator_precedence`.

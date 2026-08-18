@@ -97,12 +97,18 @@ struct ProblemParameters
         sizes = [n]
         ProblemParameters(M, variables, f_num, sizes, qvs, qvs_relaxed, p)
     end
+    function ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{Any}, qvs_relaxed::Vector{Vector{Any}}, p::Int)
+        ProblemParameters(variables, f_num, convert(Vector{QuantifiedVariable}, qvs), convert(Vector{Vector{QuantifiedVariable}}, qvs_relaxed), p)
+    end
     function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
         n = length(f_num)
         @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to number of functions."
         @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
         userfunctions = UserDefinedSymbolicFunctions(variables, f_num)
         new(M, userfunctions, sizes, qvs, qvs_relaxed, n, p)
+    end
+    function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{Any}, qvs_relaxed::Vector{Vector{Any}}, p::Int)
+        ProblemParameters(M, variables, f_num, sizes, convert(Vector{QuantifiedVariable}, qvs), convert(Vector{Vector{QuantifiedVariable}}, qvs_relaxed), p)
     end
     function ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::Vector{Function}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
         n = length(f)
@@ -125,6 +131,9 @@ get_p(parameters::ProblemParameters) = parameters.p
 struct ProblemDomains{T}
     P::Vector{IntervalArithmetic.Interval{T}}
     G::Vector{IntervalArithmetic.Interval{T}}
+    function ProblemDomains(P, G)
+        new{Float64}(convert(Vector{IntervalArithmetic.Interval{Float64}}, P), convert(Vector{IntervalArithmetic.Interval{Float64}}, G))
+    end
 end
 
 get_P(domains::ProblemDomains) = domains.P
