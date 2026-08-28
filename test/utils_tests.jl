@@ -8,7 +8,7 @@ include("../src/utils.jl")
         @test reluder(1) == 1
         @test reluder(7.3) == 1
     end
-    @testset "IntervalArithmetic" begin
+    @testset "Intervals" begin
         @test reluder(interval(-1, -0.5)) == interval(0, 0)
         @test reluder(interval(-1, 0)) == interval(0, 0)
         @test reluder(interval(-1, 1)) == interval(0, 1)
@@ -17,8 +17,6 @@ include("../src/utils.jl")
         @test reluder(interval(0, 0)) == interval(1, 1)
     end
 end
-
-
 
 @testset "Has a flat content" begin
     @test has_flat_content([1, 2, 3]) == true

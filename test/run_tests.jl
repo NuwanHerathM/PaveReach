@@ -10,4 +10,7 @@ using Test
         include("quantifiedconstraintproblem_tests.jl")
     end
 
+    @testset "Utils tests" begin
+        include("utils_tests.jl")
+    end
 end

@@ -26,19 +26,19 @@ G = [interval(minus_inf, 4),                                                    
     interval(minus_inf, 4)]                                                                     # f_4(x, y) <= 4 that is f_4(x, y) ∈ (-∞, 4]
 domains = ProblemDomains(P, G)
 
-ϵ_x = 0.1
+ϵ_x = [0.1, 0.1]
 configuration = PavingConfiguration(ϵ_x)
 
 println(configuration)
 
 # Pave
 
-inn, out, delta = pave_12(X_0, parameters, domains, configuration)
+inn, out, delta = pave(X_0, parameters, domains, configuration)
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 # Save the paving in .png file
 
-outfile = "$(filename)_11_$(ϵ_x).png"
+outfile = "$(filename)_$(ϵ_x).png"
 
 width = 1000
 height = 1000

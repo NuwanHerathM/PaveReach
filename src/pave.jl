@@ -9,6 +9,7 @@ include("quantifiedconstraintproblem.jl")
 const global minus_inf = -100000
 const global plus_inf = 100000
 const global strict_epsilon = 0.0001
+global NB_EVALUATIONS::Unsigned
 
 # Paving
 
@@ -116,7 +117,7 @@ end
 
 increment!(indices, lengths, pos) = increment!(indices, lengths, pos, 0)
 
-function complement(x::IntervalArithmetic.Interval{T}) where T <: Number
+function complement(x::IntervalArithmetic.Interval{T}) where T <: Real
     l = []
     if x.lo != minus_inf
         push!(l, interval(minus_inf, x.lo - strict_epsilon))
@@ -128,11 +129,11 @@ function complement(x::IntervalArithmetic.Interval{T}) where T <: Number
 end
 
 "Custom version of isbounded to handle pseudo_infinity values."
-function is_bounded(interval::IntervalArithmetic.Interval{T}) where T <: Number
+function is_bounded(interval::IntervalArithmetic.Interval{T}) where T <: Real
     return !isempty(interval) && interval.lo != minus_inf && interval.hi != plus_inf
 end
 
-function is_bounded(intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Number
+function is_bounded(intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Real
     return all(is_bounded, intervals)
 end
 
@@ -144,7 +145,7 @@ function atom_conjunction(atom::Atom, n::Int)
     return ∧(conjuncted_predicates...)
 end
 
-function atom_complement_disjunction(atom::Atom, intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Number
+function atom_complement_disjunction(atom::Atom, intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Real
     if length(intervals) == 1
         interval = first(intervals)
         if is_bounded(interval)
@@ -176,7 +177,7 @@ function atom_complement_disjunction(atom::Atom, intervals::Vector{IntervalArith
     end
 end
 
-function expand_1(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms) where T <: Number
+function expand_1(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms) where T <: Real
     if M isa Atom
         indices = indices_dict[M.value]
         n_indices = last(indices) - first(indices) + 1
@@ -201,7 +202,7 @@ end
 
 expand_1(M, indices_dict, intervals) = expand_1(M, indices_dict, intervals, atoms(M))
 
-function expand_2(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms, previous_token=nothing) where T <: Number
+function expand_2(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms, previous_token=nothing) where T <: Real
     if M isa Atom
         if previous_token != ¬
             range = indices_dict[M.value]
@@ -328,7 +329,7 @@ function complement_ranges_2(M, indices_dict)
     return ranges
 end
 
-function expand_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}, ranges::Vector{UnitRange{Int}}) where T <: Number
+function expand_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}, ranges::Vector{UnitRange{Int}}) where T <: Real
     positions = vcat(map(collect, ranges)...)
     expanded_intervals = IntervalArithmetic.Interval{T}[]
     for i in 1:length(intervals)
@@ -385,7 +386,7 @@ function test_zero_not_in(M, R, positions_dict)
     end
 end
 
-function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Forall, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -393,11 +394,13 @@ function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        global NB_EVALUATIONS
+        NB_EVALUATIONS += 1
         return test_zero_in(get_M(qcp), R_inner, get_positions_dict(qcp))
     end
 end
 
-function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -405,11 +408,13 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
         quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        global NB_EVALUATIONS
+        NB_EVALUATIONS += 1
         return test_zero_not_in(get_M(qcp), R_outer, get_positions_dict(qcp)) 
     end
 end
 
-function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -417,11 +422,13 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        global NB_EVALUATIONS
+        NB_EVALUATIONS += 1
         return test_zero_not_in(get_M(qcp), R_outer, get_positions_dict(qcp))
     end
 end
 
-function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Number}
+function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Forall, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -429,6 +436,8 @@ function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
         dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
         R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        global NB_EVALUATIONS
+        NB_EVALUATIONS += 1
         return test_zero_in(get_M(qcp), R_inner, get_positions_dict(qcp))
     end
 end
@@ -437,7 +446,7 @@ end
 #     return [f[i]([X.v..., interval...]) for i in 1:length(f)]
 # end
 
-function check_is_in(X_0, P_in::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: Number
+function check_is_in(X_0, P_in::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: Real
     @assert criterion == 1 || criterion == 2
 
     indices_forall = [i for (q, i) in get_qvs(qcp) if q == Forall] .- length(X_0)
@@ -477,7 +486,7 @@ end
 check_is_in_1(X_0, P_in, qcp) = check_is_in(X_0, P_in, qcp, 1)
 check_is_in_2(X_0, P_in, qcp) = check_is_in(X_0, P_in, qcp, 2)
 
-function check_is_out(X_0, P_out::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: Number
+function check_is_out(X_0, P_out::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: Real
     @assert criterion == 1 || criterion == 2
 
     indices_forall = [i for (q, i) in get_qvs(qcp) if q == Forall] .- length(X_0)
@@ -622,7 +631,7 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
     return QuantifiedConstraintProblem(problem_out, qvs, qvs_relaxed_out, p + n + Δn_out, n + Δn_out)
 end
 
-Precision = Union{T, Vector{T}} where T<:Number
+Precision = Union{T, Vector{T}} where T<:Real
 
 struct PavingConfiguration
     ϵ_x::Precision
@@ -660,7 +669,7 @@ function Base.show(io::IO, configuration::PavingConfiguration)
     print(io, if configuration.allow_exists_or_forall_bisection "Normal bisection on P" else "No standard bisection on P" end)
 end
 
-function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, configuration, criterion_in, criterion_out)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Number}
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, configuration, criterion_in, criterion_out, verbose=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Real}
     X_length = length(X)
     P_length = length(get_P(domains))
     @assert X_length + P_length == get_p(parameters) "Total number of variables, in X and p_in, must be equal to p = $(get_p(parameters))."
@@ -688,7 +697,9 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     P_out = deepcopy(P_in)
 
     ϵ_x = get_ϵ_x(configuration)
+    @assert length(ϵ_x) == X_length "Length of ϵ_x must be equal to the number of variables in X, $(X_length)."
     ϵ_p = get_ϵ_p(configuration)
+    @assert isnothing(ϵ_p) || length(ϵ_p) == P_length "Length of ϵ_p must be equal to the number of parameters, $(P_length)."
     allow_exists_or_forall_bisection = get_allow_exists_or_forall_bisection(configuration)
     allow_exists_and_forall_bisection = get_allow_exists_and_forall_bisection(configuration)
 
@@ -704,7 +715,11 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     out = []
     delta = []
     list = [(X, P_in, P_out)]
+    nb_iterations = 0
+    global NB_EVALUATIONS
+    NB_EVALUATIONS = 0
     while !isempty(list)
+        nb_iterations += 1
         X, P_in, P_out = pop!(list)
         if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
             if check_is_in(X, P_in, qcp_in)
@@ -806,13 +821,20 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
             end
         end
     end
+    if verbose
+        println("Paving completed.")
+        println("\tNumber of iterations: $nb_iterations")
+        println("\tNumber of evaluations: $NB_EVALUATIONS")
+    end
     return inn, out, delta
 end
 
-pave_11(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 1, 1)
-pave_12(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 1, 2)
-pave_21(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 2, 1)
-pave_22(X, parameters, domains, configuration) = pave(X, parameters, domains, configuration, 2, 2)
+pave_11(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 1, verbose)
+pave_12(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 2, verbose)
+pave_21(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 2, 1, verbose)
+pave_22(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 2, 2, verbose)
+
+pave(X, parameters, domains, configuration, verbose=true) = pave_21(X, parameters, domains, configuration, verbose)
 
 function bisection_slice(box, ϵ)
     diams = IntervalArithmetic.diam.(box)
@@ -854,7 +876,7 @@ end
 Pave the input box X, when each component of X is monotonous with respect to the set membership relation.
 Faster than pave_monotonous_sides, but relies on a heuristic that may produce additional undecided boxes. (This behavior is obvious when the input domain X_0 is totally inside or outside the set.)
 """
-function pave_monotonous_mid(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out) where {N, T<:Number}
+function pave_monotonous_mid(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out) where {N, T<:Real}
     @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
     @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
     @assert length(optimization_directions) == length(X) "Length of optimization_directions must be equal to the number of variables in X."
@@ -1003,7 +1025,7 @@ forward_slices(box, optimization_directions, unchanged_face) = slices(box, optim
 Pave the input box X, when each component of X is monotonous with respect to the set membership relation.
 Slower than pave_monotonous_mid, but does not produce unexpected undecided boxes.
 """
-function pave_monotonous_sides_optimized(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out) where {N, T<:Number}
+function pave_monotonous_sides_optimized(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out) where {N, T<:Real}
     @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
     @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
     @assert length(optimization_directions) == length(X) "Length of optimization_directions must be equal to the number of variables in X."
@@ -1145,14 +1167,14 @@ draw_inn_rectangles(inn) = draw_rectangles(inn, :green)
 draw_out_rectangles(out) = draw_rectangles(out, :cyan)
 
 function draw(p, X_0, inn, out, delta)
-    if isa(X_0, IntervalBox{1, <:Number})
+    if isa(X_0, IntervalBox{1, <:Real})
         xticks!((X_0[1].lo:1:X_0[1].hi))
         yaxis!(false)
 
         draw_delta_lines(p, delta)
         draw_inn_lines(p, inn)
         draw_out_lines(p, out)
-    elseif isa(X_0, IntervalBox{2, <:Number})
+    elseif isa(X_0, IntervalBox{2, <:Real})
         xs = X_0[1]
         ys = X_0[2]
         xlims!((xs.lo, xs.hi))
@@ -1187,12 +1209,12 @@ function luxor_box2pq(box)
 end
 
 function luxor_rescale(p, q, X_0, width, height, buffer)
-    if isa(X_0, IntervalBox{1, <:Number})
+    if isa(X_0, IntervalBox{1, <:Real})
         scale_x = width / (X_0[1].hi - X_0[1].lo)
         scale_y = height / 0.2
         p_rescaled = Luxor.Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y + 0.1) * scale_y)
         q_rescaled = Luxor.Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y + 0.1) * scale_y)
-    elseif isa(X_0, IntervalBox{2, <:Number})
+    elseif isa(X_0, IntervalBox{2, <:Real})
         scale_x = width / (X_0[1].hi - X_0[1].lo)
         scale_y = height / (X_0[2].hi - X_0[2].lo)
         p_rescaled = Luxor.Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y - X_0[2].lo) * scale_y)
@@ -1233,7 +1255,7 @@ luxor_draw_out_boxes(out, X_0, width, height, buffer) = luxor_draw_boxes(out, "c
 luxor_draw_delta_boxes(delta, X_0, width, height, buffer) = luxor_draw_boxes(delta, "yellow", X_0, width, height, buffer)
 
 function luxor_draw(X_0, inn, out, delta, width, height, buffer)
-    if isa(X_0, IntervalBox{1, <:Number})
+    if isa(X_0, IntervalBox{1, <:Real})
         background("white")
 
         luxor_draw_inn_rows(inn, X_0, width, height, buffer)
@@ -1243,7 +1265,7 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer)
         sethue("black")
         # xticks
         tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
-    elseif isa(X_0, IntervalBox{2, <:Number})
+    elseif isa(X_0, IntervalBox{2, <:Real})
         background("white")
 
         luxor_draw_inn_boxes(inn, X_0, width, height, buffer)

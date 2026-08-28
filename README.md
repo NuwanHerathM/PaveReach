@@ -79,13 +79,16 @@ julia ex_0-1_star.jl
 
 It should return:
 ```
-ϵ_x: 0.1
+ϵ_x: [0.1, 0.1]
 Not refined
 No standard bisection on P
-Undecided domain: 1.4 %
-The result was saved in ex_0-1_star_11_0.1.png.
+Paving completed.
+	Number of iterations: 995
+	Number of evaluations: 1867
+Undecided domain: 1.1 %
+The result was saved in ex_0-1_star_[0.1, 0.1].png.
 ```
-You will find the output in a file named `ex_0-1_star_11_0.1.png`.
+You will find the output in a file named `ex_0-1_star_[0.1, 0.1].png`.
 
 <!-- #### Try a 2D toy example
 
@@ -249,7 +252,7 @@ In the definition of the problem, the first quantified variables are reserved fo
 
 For example, let us take a look at the following problem:
 <!-- in `ex_5-4_circle_collision.jl` the problem is -->
-$$\{(x, y) \in [-5, 5]^2 \, | \, \forall t \in [-\pi, \pi],(2.5*sin(t) - x)^2 + (2.5*cos(t) - y)^2 \in [0.25, +\infty]\}$$
+$$\\{(x, y) \in [-5, 5]^2 \mid \forall t \in [-\pi, \pi],(2.5*sin(t) - x)^2 + (2.5*cos(t) - y)^2 \in [0.25, +\infty]\\}$$
 
 Even though the total number of variable is `p=3`, one only has to specify the quantifier for the third variable
 ```julia
@@ -271,7 +274,7 @@ Select one of the four paving functions according to this table
 > [!NOTE]
 > The user does not have to construct $\neg\mathbb{P}$ or $\neg M$. The four paving functions take $\mathbb{P}$ and $M$ as input, so swapping between the functions amounts only to changing the name of the function.
 
-The oracles rely on the computation of a reachable set. The implementation uses the inner and outer approximations. Inner approximation requires quantifier relaxation. If you are unfamiliar with this, use `pave_21` and for the relaxed quantifiers, repeat the original quantifiers as in `examples/ex_0-1_star.jl`.
+The oracles rely on the computation of a reachable set. The implementation uses the inner and outer approximations. Inner approximation requires quantifier relaxation. If you are unfamiliar with this, use the default `pave` (alias for `pave_21`) and for the relaxed quantifiers, repeat the original quantifiers as in `examples/ex_0-1_star.jl`.
 
 ## Symbolic expression of the functions
 
@@ -298,17 +301,11 @@ More information on the `@variables` macro can be found [here](https://symbolics
 ## Problem
 
 We characterize the set
-$$
-  \Sigma = \{ x \in \mathbb{D} \mid \forall p_1 \in \mathbb{P}_1, \exists p_2 \in \mathbb{P}_2, \dots, \forall p_{2l-1} \in \mathbb{P}_{2l-1}, \exists p_{2l} \in \mathbb{P}_{2l}, M(x, p) \}
-$$
+$$\Sigma = \\{ x \in \mathbb{D} \mid \forall p_1 \in \mathbb{P}_1, \exists p_2 \in \mathbb{P}_2, \dots, \forall p_{2l-1} \in \mathbb{P}_{2l-1}, \exists p_{2l} \in \mathbb{P}_{2l}, M(x, p) \\}$$
 where, for predicates $P(x, p)$ defined as
-$$
-  P(x, p) := f(x, p) \in \mathbb{G},
-$$
+$$P(x, p) := f(x, p) \in \mathbb{G},$$
 we have a quantifier free first order logic formula $M(x, p)$ such that
-$$
-  M(x, p) := P(x, p) \mid M(x, p) \wedge M(x, p) \mid M(x, p) \vee M(x, p) \mid \neg M(x, p).
-$$
+$$M(x, p) := P(x, p) \mid M(x, p) \wedge M(x, p) \mid M(x, p) \vee M(x, p) \mid \neg M(x, p).$$
 
 ### Problem parameters
 
