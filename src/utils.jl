@@ -1,81 +1,54 @@
 using LazySets, IntervalArithmetic, LinearAlgebra
 using NeuralVerification
-# using Interpolations
 
 """
-    act_gradient(act::NeuralVerification.ReLU, box::IntervalBox)
+    reluder(x)
 
-Compute the gradient of the ReLU activation over the given interval box.
-
-The gradient is 1 when x > 0 and 0 when x <= 0. See the examples for details.
-
-# Examples
-```jldoctest
-julia> using IntervalArithmetic, NeuralVerification
-julia> box_1 = IntervalBox(interval(-2, -1))
-[-2.0, -1.0]¹
-julia> act_gradient(NeuralVerification.ReLU(), box_1)
-1-element IntervalBox{Interval{Float64},1}:
- [0, 0]¹
-julia> box_2 = IntervalBox(interval(1, 2))
-[1.0, 2.0]¹
-julia> act_gradient(NeuralVerification.ReLU(), box_2)
-1-element IntervalBox{Interval{Float64},1}:
- [1, 1]¹
-julia> box_3 = IntervalBox(interval(-1, 1))
-[-1.0, 1.0]¹
-julia> act_gradient(NeuralVerification.ReLU(), box_3)
-1-element IntervalBox{Interval{Float64},1}:
- [0, 1]¹
-julia> box_4 = IntervalBox(interval(-1, 0))
-[-1.0, 0.0]¹
-julia> act_gradient(NeuralVerification.ReLU(), box_4)
-1-element IntervalBox{Interval{Float64},1}:
- [0, 0]¹
-julia> box_5 = IntervalBox(interval(0, 1))
-[0.0, 1.0]¹
-julia> act_gradient(NeuralVerification.ReLU(), box_5)
-1-element IntervalBox{Interval{Float64},1}:
- [0, 1]¹
-```
+    Compute the derivative of the ReLu function.
 """
-function act_gradient(act::NeuralVerification.ReLU, box::IntervalBox)
-    intervals = []
-    for i in 1:length(box)
-        current_interval = box[i]
-        if current_interval.hi > 0
-            upper = 1
-        else 
-            upper = 0
-        end
-        if current_interval.lo > 0
-            lower = 1
-        else 
-            lower = 0
-        end
-        push!(intervals, interval(lower, upper))
+function reluder(x)
+    if x > 0
+        return 1
+    elseif x < 0
+        return 0
+    else
+        throw(DomainError("The input to reluder must be non-zero."))
     end
-    return IntervalBox(intervals)
+end
+
+"""
+    reluder(x::IntervalArithmetic.Interval)
+
+    For [0, 0], return [1, 1].
+"""
+function reluder(x::IntervalArithmetic.Interval{T}) where T <: Real
+    if x.hi > 0
+        upper = 1
+    else 
+        upper = 0
+    end
+    if x.lo >= 0
+        lower = 1
+    else 
+        lower = 0
+    end
+    return lower <= upper ? interval(lower, upper) : interval(1, 1)
+end
+
+function act_gradient(act::NeuralVerification.ReLU, vector::AbstractVector)
+    return reluder.(vector)
 end
 
 function sigmoid(x)
    return 1.0/(1.0+exp(-x))
 end
 
-function sigmoid(box::IntervalBox)
-   l = []
-   for x in box
-      push!(l, sigmoid(x))
-   end
-   return IntervalBox(l)
-end
-
-function sigmoidder(x::Float64)
+function sigmoidder(x)
    return sigmoid(x)*(1.0-sigmoid(x))
 end
 
 # Needs correct rounding
-function sigmoidder(x::IntervalArithmetic.Interval{Float64})
+function sigmoidder(x::IntervalArithmetic.Interval{T}) where T <: Real
     if x.hi < 0
         return interval(prevfloat(sigmoidder(x.lo)), nextfloat(sigmoidder(x.hi)))
     elseif x.lo > 0
@@ -87,34 +60,22 @@ function sigmoidder(x::IntervalArithmetic.Interval{Float64})
     end
 end
 
-function act_gradient(act::NeuralVerification.Sigmoid, box::IntervalBox)
-   l = []
-   for x in box
-      push!(l, sigmoidder(x))
-   end
-   return IntervalBox(l)
+function act_gradient(act::NeuralVerification.Sigmoid, vector::AbstractVector)
+   return sigmoidder.(vector)
 end
 
-act_gradient(act::NeuralVerification.Id, box::IntervalBox) = IntervalBox(interval(1), length(box))
-
-function Diagonal end
-
-function Diagonal(box::IntervalBox)
-    M = Matrix(1.0LinearAlgebra.I, length(box), length(box))*interval(1.0,1.0)
-    for i in 1:length(box)
-        M[i,i] = box[i]
-    end
-    return M
+function act_gradient(act::NeuralVerification.Id, vector::AbstractVector{T}) where T <: Real
+    return ones(T, length(vector))
 end
 
-function affine_map(layer::NeuralVerification.Layer, z::IntervalBox)
-    return layer.weights * z + IntervalBox(layer.bias)
+function affine_map(layer::NeuralVerification.Layer, z::AbstractVector)
+    return layer.weights * z + layer.bias
 end
 
-function get_gradient(nnet::Network, x::IntervalBox)
+function get_gradient(nnet::Network, x::AbstractVector)
     z = x
     gradient = Matrix(1.0LinearAlgebra.I, length(x), length(x))
-    for (i, layer) in enumerate(nnet.layers)
+    for layer in nnet.layers
         z_hat = affine_map(layer, z)
         m_gradient = act_gradient(layer.activation, z_hat)
         gradient = Diagonal(m_gradient) * layer.weights * gradient
@@ -123,6 +84,12 @@ function get_gradient(nnet::Network, x::IntervalBox)
     return gradient
 end
 
-function get_gradient(nnet::Network, x::Vector{IntervalArithmetic.Interval{Float64}})
-    return get_gradient(nnet, IntervalBox(x))
+function get_gradient(nnet::Network, box::IntervalBox)
+    return get_gradient(nnet, box.v)
+end
+
+function has_flat_content(a::T) where T <: AbstractArray
+    dimensions = size(a)
+    @assert all(x -> x > 0, dimensions) "Array must have positive dimensions."
+    return count(x -> x != 1, dimensions) ∈ [0, 1]
 end
