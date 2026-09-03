@@ -273,7 +273,7 @@ function build_function_f_Df(f_num, x, n::Int, p::Int)
   return f_fun, Df_fun
 end
 
-function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers, q, p, n, input)
+function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers_relaxed, p, n, input)
   global inn = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
 
   radii = [IntervalArithmetic.radius(input[i]) for i=1:p]
@@ -286,10 +286,10 @@ function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers, q, p, n, input)
     inner = interval(c,c)
   
     for i = 2p-1:-2:1
-      if q[j][i] == "exists"
-        inner = inner+I(range_Dg,radii,q[j][i+1])
+      if quantifiers_relaxed[j][i] == "exists"
+        inner = inner+I(range_Dg,radii,quantifiers_relaxed[j][i+1])
       else
-        inner = slash(inner,O(range_Dg,radii,q[j][i+1]))
+        inner = slash(inner,O(range_Dg,radii,quantifiers_relaxed[j][i+1]))
         if (inner==EmptySet(1))
           break
         end
@@ -306,7 +306,7 @@ function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers, q, p, n, input)
   return inn
 end
 
-function QEapprox_o0_outer(g_fun, Dg_fun, quantifiers, q, p, n, input)
+function QEapprox_o0_outer(g_fun, Dg_fun, quantifiers, p, n, input)
   global out = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
 
   radii = [IntervalArithmetic.radius(input[i]) for i=1:p]

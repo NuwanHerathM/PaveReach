@@ -388,12 +388,10 @@ end
 
 function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
-        quantifiers = [[(Forall, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
-        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         qvs_relaxed = get_qvs_relaxed(qcp)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
-        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
-        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        dirty_quantifiers_relaxed = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
+        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers_relaxed, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_in(get_M(qcp), R_inner, get_positions_dict(qcp))
@@ -404,10 +402,7 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qvs_relaxed = get_qvs_relaxed(qcp)
-        quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
-        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
-        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_not_in(get_M(qcp), R_outer, get_positions_dict(qcp)) 
@@ -418,10 +413,7 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        qvs_relaxed = get_qvs_relaxed(qcp)
-        quantifiers_relaxed = [[[(Exists, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
-        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
-        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_not_in(get_M(qcp), R_outer, get_positions_dict(qcp))
@@ -430,12 +422,10 @@ end
 
 function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
-        quantifiers = [[(Forall, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
-        dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
         qvs_relaxed = get_qvs_relaxed(qcp)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
-        dirty_qs = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
-        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers, dirty_qs, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        dirty_quantifiers_relaxed = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
+        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers_relaxed, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_in(get_M(qcp), R_inner, get_positions_dict(qcp))

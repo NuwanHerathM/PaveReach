@@ -41,6 +41,8 @@ For `PaveReach`
 * `BenchmarkTools` v1.6.3
 * `Luxor` v4.3.0
 * `MathTeXEngine` v0.6.7
+* `NeuralVerification` v0.1.0
+* `ONNX` v0.3.0
 * `SoleLogics` v0.13.7
 * `ReusePatterns` v0.3.1
 * `Pandas` v1.6.1
@@ -56,13 +58,15 @@ Type `]` to get to the Pkg REPL-mode (the built-in Julia package manager).
 ```julia
 pkg>
 ```
-Add one package as follows.
+Add one package as follows and `NeuralVerification` from its repository link.
 ```julia
 pkg> add <name_of_the_package> [@<version>]
+pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 Or add all the packages at once.
 ```julia
-pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7 SoleLogics @0.13.7 ReusePatterns @0.3.1 Pandas @1.6.1
+pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7 ONNX @0.3.0 SoleLogics @0.13.7 ReusePatterns @0.3.1 Pandas @1.6.1
+pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
 
@@ -356,6 +360,18 @@ PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, true, false)
 Points/subdivision:
 ```julia
 PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, false, true)
+```
+
+## Paving
+
+Use one of the paving functions presented in [Oracles](#oracles) or the default function `pave`.
+```julia
+pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters::ProblemParameters, domains::ProblemDomains, configuration::PavingConfiguration)
+```
+By default, verbosity is turned on: the number of iterations and the number of evaluations is displayed.
+To turn it off:
+```julia
+pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters::ProblemParameters, domains::ProblemDomains, configuration::PavingConfiguration, verbose=false)
 ```
 
 ## Saving the output
