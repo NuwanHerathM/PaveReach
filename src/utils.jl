@@ -69,7 +69,15 @@ function act_gradient(act::NeuralVerification.Id, vector::AbstractVector{T}) whe
 end
 
 function affine_map(layer::NeuralVerification.Layer, z::AbstractVector)
-    return layer.weights * z + layer.bias
+    # Pre-allocate result vector to avoid repeated allocations
+    result = similar(z, size(layer.weights, 1))
+    # Use in-place matrix-vector multiplication
+    mul!(result, layer.weights, z)
+    # Add bias in-place to avoid creating intermediate vector
+    @inbounds for i in eachindex(result)
+        result[i] += layer.bias[i]
+    end
+    return result
 end
 
 function get_gradient(nnet::Network, x::AbstractVector)
