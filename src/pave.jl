@@ -819,6 +819,8 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     return inn, out, delta
 end
 
+pave(X::IntervalArithmetic.Interval{T}, parameters, domains, configuration, verbose=true) where T <: Real = pave(IntervalBox(X), parameters, domains, configuration, verbose)
+
 pave_11(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 1, verbose)
 pave_12(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 2, verbose)
 pave_21(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 2, 1, verbose)
@@ -1199,7 +1201,12 @@ function luxor_box2pq(box)
 end
 
 function luxor_rescale(p, q, X_0, width, height, buffer)
-    if isa(X_0, IntervalBox{1, <:Real})
+    if isa(X_0, IntervalArithmetic.Interval{<:Real})
+        scale_x = width / (X_0.hi - X_0.lo)
+        scale_y = height / 0.2
+        p_rescaled = Luxor.Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y + 0.1) * scale_y)
+        q_rescaled = Luxor.Point(buffer + (q.x - X_0[1].lo) * scale_x, buffer + height - (q.y + 0.1) * scale_y)
+    elseif isa(X_0, IntervalBox{1, <:Real})
         scale_x = width / (X_0[1].hi - X_0[1].lo)
         scale_y = height / 0.2
         p_rescaled = Luxor.Point(buffer + (p.x - X_0[1].lo) * scale_x, buffer + height - (p.y + 0.1) * scale_y)
@@ -1245,7 +1252,7 @@ luxor_draw_out_boxes(out, X_0, width, height, buffer) = luxor_draw_boxes(out, "c
 luxor_draw_delta_boxes(delta, X_0, width, height, buffer) = luxor_draw_boxes(delta, "yellow", X_0, width, height, buffer)
 
 function luxor_draw(X_0, inn, out, delta, width, height, buffer)
-    if isa(X_0, IntervalBox{1, <:Real})
+    if isa(X_0, IntervalArithmetic.Interval{<:Real}) || isa(X_0, IntervalBox{1, <:Real})
         background("white")
 
         luxor_draw_inn_rows(inn, X_0, width, height, buffer)

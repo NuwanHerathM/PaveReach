@@ -367,6 +367,7 @@ PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, false, true)
 Use one of the paving functions presented in [Oracles](#oracles) or the default function `pave`.
 ```julia
 pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters::ProblemParameters, domains::ProblemDomains, configuration::PavingConfiguration)
+pave(X::IntervalArithmetic.Interval{T}, parameters::ProblemParameters, domains::ProblemDomains, configuration::PavingConfiguration)
 ```
 By default, verbosity is turned on: the number of iterations and the number of evaluations is displayed.
 To turn it off:
