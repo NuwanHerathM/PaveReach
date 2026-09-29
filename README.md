@@ -377,7 +377,14 @@ pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters::ProblemParameters, dom
 
 ## Saving the output
 
-### With Plots
+### New procedure
+
+```julia
+outfile = ...
+save_drawing(X_0, inn, out, delta, outfile)
+```
+
+### With Plots (deprecated)
 
 ```julia
 p = plot()
@@ -403,7 +410,7 @@ Run the script in interactive mode in order to keep the REPL open to visualize t
 julia -i ...
 ```
 
-### With Luxor
+### With Luxor (deprecated)
 
 ```julia
 width = 600

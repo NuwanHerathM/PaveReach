@@ -1278,3 +1278,26 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer)
         error("Plotting is only supported for 1D and 2D problems.")
     end
 end
+
+function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, filename) where N
+    outdir = "outputs/"
+    if !isdir(outdir)
+        mkdir(outdir)
+        println("Created $(outdir).")
+    end
+    filepath = outdir * filename
+    width = 1000
+    height = @match N begin
+        1 => 50
+        2 => 1000
+        _ => error("Plotting is only supported for 1D and 2D problems.")
+    end
+    buffer = 50
+    Drawing(width + 2*buffer, height + 2*buffer, filepath)
+    luxor_draw(X_0, inn, out, delta, width, height, buffer)
+    finish()
+    println("The result was saved in $(filepath).")
+end
+
+save_drawing(X_0::AbstractVector{IntervalArithmetic.Interval{T}}, inn, out, delta, filename) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename)
+save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, filename) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename)
