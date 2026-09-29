@@ -687,9 +687,9 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     P_out = deepcopy(P_in)
 
     ϵ_x = get_ϵ_x(configuration)
-    @assert length(ϵ_x) == X_length "Length of ϵ_x must be equal to the number of variables in X, $(X_length)."
+    @assert length(ϵ_x) == X_length "Length of ϵ_x must be equal to the number of variables in X: $(X_length)."
     ϵ_p = get_ϵ_p(configuration)
-    @assert isnothing(ϵ_p) || length(ϵ_p) == P_length "Length of ϵ_p must be equal to the number of parameters, $(P_length)."
+    @assert isnothing(ϵ_p) || length(ϵ_p) == P_length "Length of ϵ_p must be equal to the number of parameters: $(P_length)."
     allow_exists_or_forall_bisection = get_allow_exists_or_forall_bisection(configuration)
     allow_exists_and_forall_bisection = get_allow_exists_and_forall_bisection(configuration)
 
@@ -1251,7 +1251,7 @@ luxor_draw_inn_boxes(inn, X_0, width, height, buffer) = luxor_draw_boxes(inn, "g
 luxor_draw_out_boxes(out, X_0, width, height, buffer) = luxor_draw_boxes(out, "cyan", X_0, width, height, buffer)
 luxor_draw_delta_boxes(delta, X_0, width, height, buffer) = luxor_draw_boxes(delta, "yellow", X_0, width, height, buffer)
 
-function luxor_draw(X_0, inn, out, delta, width, height, buffer)
+function luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks=nothing, yticks=nothing)
     if isa(X_0, IntervalArithmetic.Interval{<:Real}) || isa(X_0, IntervalBox{1, <:Real})
         background("white")
 
@@ -1261,25 +1261,31 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer)
 
         sethue("black")
         # xticks
-        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
+        x_start = isnothing(xticks) ? X_0[1].lo : xticks[1]
+        x_finish = isnothing(xticks) ? X_0[1].hi : xticks[2]
+        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= x_start, finishnumber=x_finish, major=4, minor=0)
     elseif isa(X_0, IntervalBox{2, <:Real})
         background("white")
-
+        
         luxor_draw_inn_boxes(inn, X_0, width, height, buffer)
         luxor_draw_out_boxes(out, X_0, width, height, buffer)
         luxor_draw_delta_boxes(delta, X_0, width, height, buffer)
-
+        
         sethue("black")
         # xticks
-        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= X_0[1].lo, finishnumber=X_0[1].hi, major=4, minor=0)
+        x_start = isnothing(xticks) ? X_0[1].lo : xticks[1]
+        x_finish = isnothing(xticks) ? X_0[1].hi : xticks[2]
+        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= x_start, finishnumber=x_finish, major=4, minor=0)
         # yticks
-        tickline(Luxor.Point(buffer + width, buffer + height), Luxor.Point(buffer + width, buffer), startnumber= X_0[2].lo, finishnumber=X_0[2].hi, major=4, minor=0)
+        y_start = isnothing(yticks) ? X_0[2].lo : yticks[1]
+        y_finish = isnothing(yticks) ? X_0[2].hi : yticks[2]
+        tickline(Luxor.Point(buffer + width, buffer + height), Luxor.Point(buffer + width, buffer), startnumber= y_start, finishnumber=y_finish, major=4, minor=0)
     else
         error("Plotting is only supported for 1D and 2D problems.")
     end
 end
 
-function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, filename) where N
+function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, filename, xticks=nothing, yticks=nothing) where N
     outdir = "outputs/"
     if !isdir(outdir)
         mkdir(outdir)
@@ -1294,10 +1300,10 @@ function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, filename) wh
     end
     buffer = 50
     Drawing(width + 2*buffer, height + 2*buffer, filepath)
-    luxor_draw(X_0, inn, out, delta, width, height, buffer)
+    luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks, yticks)
     finish()
     println("The result was saved in $(filepath).")
 end
 
-save_drawing(X_0::AbstractVector{IntervalArithmetic.Interval{T}}, inn, out, delta, filename) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename)
-save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, filename) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename)
+save_drawing(X_0::AbstractVector{IntervalArithmetic.Interval{T}}, inn, out, delta, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename, xticks, yticks)
+save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename, xticks, yticks)
