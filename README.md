@@ -90,9 +90,19 @@ Paving completed.
 	Number of iterations: 995
 	Number of evaluations: 1867
 Undecided domain: 1.1 %
-The result was saved in ex_0-1_star_[0.1, 0.1].png.
+The result was saved in outputs/ex_0-1_star_[0.1, 0.1].png.
 ```
-You will find the output in a file named `ex_0-1_star_[0.1, 0.1].png`.
+You will find the output in a file named `ex_0-1_star_[0.1, 0.1].png` in `outputs/`.
+
+#### Another simple example
+
+
+Move into the `examples/` folder.
+
+Run:
+```
+julia ex_0-0_disk.jl
+```
 
 <!-- #### Try a 2D toy example
 

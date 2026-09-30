@@ -40,10 +40,4 @@ println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, dig
 
 outfile = "$(filename)_$(ϵ_x).png"
 
-width = 1000
-height = 1000
-buffer = 50
-Drawing(width + 2*buffer, height + 2*buffer, outfile)
-luxor_draw(X_0, inn, out, delta, width, height, buffer)
-finish()
-println("The result was saved in $(outfile).")
+save_drawing(X_0, inn, out, delta, outfile)
