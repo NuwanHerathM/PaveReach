@@ -345,9 +345,9 @@ function expand_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}, ran
     return expanded_intervals
 end
 
-function inflate(l, indices)
+function inflate(vector::AbstractVector, indices)
     inflated = []
-    for (i, item) in enumerate(l)
+    for (i, item) in enumerate(vector)
         if i in indices
             push!(inflated, item)
             push!(inflated, item)
@@ -356,6 +356,10 @@ function inflate(l, indices)
         end
     end
     return inflated
+end
+
+function inflate(matrix::AbstractMatrix, indices)
+    return stack(inflate(eachrow(matrix), indices), dims=1)
 end
 
 function is_zero_in(R, i)

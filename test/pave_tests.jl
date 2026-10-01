@@ -153,8 +153,13 @@ end
     @test expand_intervals(intervals, [1:2, 6:6]) == [interval(minus_inf, -5 - strict_epsilon), interval(5 + strict_epsilon, plus_inf), interval(minus_inf, -5 - strict_epsilon), interval(5 + strict_epsilon, plus_inf), interval(minus_inf, 8), interval(3, plus_inf), interval(0, 10), interval(minus_inf, 1 - strict_epsilon), interval(2 + strict_epsilon, plus_inf)]
 end
 
-@testset "Inflate list" begin
-    @test inflate([7,6,3,5,0], [2,4]) == [7,6,6,3,5,5,0]
+@testset "Inflate" begin
+    @testset "Vector" begin
+        @test inflate([7,6,3,5,0], [2,4]) == [7,6,6,3,5,5,0]
+    end
+    @testset "Matrix" begin
+        @test inflate([1 2; 7 6; 5 0], [1,3]) == [1 2; 1 2; 7 6; 5 0; 5 0]
+    end
 end
 
 @testset "Zero membership" begin
