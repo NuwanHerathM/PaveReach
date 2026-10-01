@@ -15,25 +15,11 @@ function parse_commandline()
             help = "confidence delta"
             arg_type = Float64
             required = true
-        # "eps_x"
-        #     help = "epsilon for the paving"
-        #     arg_type = Float64
-        #     required = true
-        # "eps_p"
-        #     help = "epsilon for the parameters"
-        #     arg_type = Float64
-        #     required = false
         "--refine", "-r"
             help = "bisect the parameters with ∀ and replace the ones with ∃ by points (or vice versa), requires eps_p, does not work with --subdivide"
             action = :store_true
         "--subdivide", "-s"
             help = "bisect the parameters with either ∀ or ∃, requires eps_p, does not work with --refine"
-            action = :store_true
-        "--with_plots"
-            help = "generate the output with Plots.jl"
-            action = :store_true
-        "--with_luxor"
-            help = "generate the output with Luxor.jl"
             action = :store_true
     end
 
@@ -42,77 +28,54 @@ end
 
 parsed_args = parse_commandline()
 # ------------------------------------------------------
-δ = parsed_args["delta"]
-
-# ϵ_x = parsed_args["eps_x"]
-# ϵ_p = parsed_args["eps_p"]
-ϵ_x = [0.05, 0.05]
-ϵ_p = nothing
-allow_exists_and_forall_bisection = parsed_args["refine"]
-allow_exists_or_forall_bisection = parsed_args["subdivide"]
-
-
-if isnothing(ϵ_p)
-    @assert !allow_exists_and_forall_bisection "eps_p was not provided. Refinement requires eps_p. Use --help for more information."
-    @assert !allow_exists_or_forall_bisection "eps_p was not provided. Subdivision requires eps_p. Use --help for more information."
-else
-    if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
-        @warn "eps_p was provided, but will not be used. Provide options --refine or --subdivide in order to use eps_p."
-    end
-end
-@assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
-
-use_plots = parsed_args["with_plots"]
-use_luxor = parsed_args["with_luxor"]
-
-@assert nand(use_plots, use_luxor) "Plots and Luxor are mutually exclusive. Use --help for more information."
-# ------------------------------------------------------
 
 filename = splitext(PROGRAM_FILE)[1]
 
-nnet = read_nnet("running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
+# Load the neural network
+
+nnet = read_nnet("models/running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
+
+# Define the confidence function
 
 confidence(vect::AbstractVector) = vect[1] - vect[2]
 confidence(mat::Matrix) = mat[1, :] - mat[2, :]
 
-n = 1
-p = 3
-f_fun = [x -> (confidence(N(x[1:2])) - x[3])]
-Df_fun = [x -> [confidence(DN(x[1:2]))... -1]]
-problem = Problem(f_fun, Df_fun, [[1]])
-qvs = []
-qcp = QuantifiedConstraintProblem(problem, qvs, [qvs], p, n)
+# Set the problem
+
+p = 2
+f_fun = Function[x -> confidence(N(x[1:2]))]
+Df_fun = Function[x -> [confidence(DN(x[1:2]))...]]
+sizes = [1]
+formula = parseformula("P_1")
+qvs = QuantifiedVariable[]
+qvs_relaxed = [qvs]
+parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
 X_0 = IntervalBox(interval(-1, 1), interval(-1, 1))
-p_in = []
-p_out = deepcopy(p_in)
+P = [] 
+δ = parsed_args["delta"]
 G = [interval(δ + strict_epsilon, plus_inf)]
+domains = ProblemDomains(P, G)
 
-inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
+ϵ_x = [0.05, 0.05]
+ϵ_p = nothing
+allow_exists_and_forall_bisection = parsed_args["refine"]
+allow_exists_or_forall_bisection = parsed_args["subdivide"]
+configuration = PavingConfiguration(ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
 
-if allow_exists_and_forall_bisection
+# Pave
+
+inn, out, delta = pave_12(X_0, parameters, domains, configuration)
+
+# Save the paving in .png file
+
+if get_allow_exists_and_forall_bisection(configuration)
     outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_refined.png"
-elseif allow_exists_or_forall_bisection
+elseif get_allow_exists_or_forall_bisection(configuration)
     outfile = "$(filename)_$(δ)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
 else
     outfile = "$(filename)_$(δ)_$(ϵ_x).png"
 end
 
-if use_plots
-    p = plot()
-    draw(p, X_0, inn, out, delta)
-    plot(p)
-    savefig(outfile)
-    println("The result was saved in $(outfile).")
-end
-
-if use_luxor
-    width = 600
-    height = 600
-    buffer = 50
-    Drawing(width + 2*buffer, height + 2*buffer, outfile)
-    luxor_draw(X_0, inn, out, delta, width, height, buffer)
-    finish()
-    println("The result was saved in $(outfile).")
-end
+save_drawing(X_0, inn, out, delta, outfile)

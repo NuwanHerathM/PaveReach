@@ -547,7 +547,7 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
         for i in 1:(n + Δn_in)
             f_num_in[i] -= z_in[i]
         end
-        f_fun_in, Df_fun_in = build_function_f_Df(f_num_in, [variables..., z_in...], n + Δn_in, p + n + Δn_in)
+        f_fun_in, Df_fun_in = build_function_f_Df(f_num_in, [variables; z_in], n + Δn_in, p + n + Δn_in)
     elseif userfunctions isa UserDefinedFunctions
         f_inflated = inflate(get_f(userfunctions), positions_in)
         Df_inflated = inflate(get_Df(userfunctions), positions_in)
@@ -597,7 +597,7 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
         for i in 1:(n + Δn_out)
             f_num_out[i] -= z_out[i]
         end
-        f_fun_out, Df_fun_out = build_function_f_Df(f_num_out, [variables..., z_out...], n + Δn_out, p + n + Δn_out)
+        f_fun_out, Df_fun_out = build_function_f_Df(f_num_out, [variables; z_out], n + Δn_out, p + n + Δn_out)
     elseif userfunctions isa UserDefinedFunctions
         f_inflated = inflate(get_f(userfunctions), positions_out)
         Df_inflated = inflate(get_Df(userfunctions), positions_out)
