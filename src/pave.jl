@@ -613,25 +613,30 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
     return QuantifiedConstraintProblem(problem_out, qvs, qvs_relaxed_out)
 end
 
-Precision = Union{T, Vector{T}} where T<:Real
-
-struct PavingConfiguration
-    ϵ_x::Precision
-    ϵ_p::Union{Precision, Nothing}
+struct PavingConfiguration{T <: AbstractFloat}
+    ϵ_x::AbstractVector{T}
+    ϵ_p::AbstractVector{T}
     allow_exists_or_forall_bisection::Bool
     allow_exists_and_forall_bisection::Bool
-    function PavingConfiguration(ϵ_x::Precision)
-        new(ϵ_x, nothing, false, false)
+    function PavingConfiguration(ϵ_x)
+        PavingConfiguration(ϵ_x, [], false, false)
     end
-    function PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, allow_exists_or_forall_bisection::Bool, allow_exists_and_forall_bisection::Bool)
+    function PavingConfiguration(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
+        type_x = ϵ_x isa AbstractVector ? eltype(ϵ_x) : typeof(ϵ_x)
+        @assert type_x <: AbstractFloat "ϵ_x must be a floating-point number or a vector of floating-point numbers."
+        PavingConfiguration(isempty(ϵ_x) ? type_x[] : float(ϵ_x), isempty(ϵ_p) ? type_x[] : float(ϵ_p), allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
+    end
+    function PavingConfiguration(ϵ_x::T, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection) where T <: AbstractFloat
+        PavingConfiguration([ϵ_x], ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
+    end
+    function PavingConfiguration(ϵ_x::AbstractVector{T}, ϵ_p::T, allow_exists_or_forall_bisection::Bool, allow_exists_and_forall_bisection::Bool) where T <: AbstractFloat
+        PavingConfiguration(ϵ_x, [ϵ_p], allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
+    end
+    function PavingConfiguration(ϵ_x::AbstractVector{T}, ϵ_p::AbstractVector{T}, allow_exists_or_forall_bisection::Bool, allow_exists_and_forall_bisection::Bool) where T <: AbstractFloat
+        @assert !isempty(ϵ_x) "ϵ_x must be provided."
         @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive."
-        @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
-        new(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
-    end
-    function PavingConfiguration(ϵ_x::Precision, ϵ_p::Nothing, allow_exists_or_forall_bisection::Bool, allow_exists_and_forall_bisection::Bool)
-        @assert !allow_exists_or_forall_bisection "ϵ_p must be provided when subdivision on parameter space is allowed."
-        @assert !allow_exists_and_forall_bisection "ϵ_p must be provided when refinement on parameter space is allowed."
-        new(ϵ_x, nothing, false, false)
+        @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isempty(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
+        new{T}(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
     end
 end
 
@@ -681,7 +686,7 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     ϵ_x = get_ϵ_x(configuration)
     @assert length(ϵ_x) == X_length "Length of ϵ_x must be equal to the number of variables in X: $(X_length)."
     ϵ_p = get_ϵ_p(configuration)
-    @assert isnothing(ϵ_p) || length(ϵ_p) == P_length "Length of ϵ_p must be equal to the number of parameters: $(P_length)."
+    @assert isempty(ϵ_p) || length(ϵ_p) == P_length "Length of ϵ_p must be equal to the number of parameters: $(P_length)."
     allow_exists_or_forall_bisection = get_allow_exists_or_forall_bisection(configuration)
     allow_exists_and_forall_bisection = get_allow_exists_and_forall_bisection(configuration)
 
