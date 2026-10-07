@@ -7,7 +7,10 @@ using BenchmarkTools
 nnet = read_onnx_mlp("models/normed_etcs_2x250_nodes.onnx")
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_jacobian(nnet, x)
-dN(x, i) = get_partial_derivative(nnet, i, x)
+dN(i, x) = get_partial_derivative(nnet, i, x)
+N(x::Tuple) = N(collect(x))
+DN(x::Tuple) = DN(collect(x))
+dN(i, x::Tuple) = dN(i, collect(x))
 
 # Define the confidence function
 
@@ -17,7 +20,7 @@ confidence(mat::Matrix) = mat[2, :] - mat[1, :]
 # Set the problem
 
 p = 3
-f_fun = Function[x -> confidence(N([x[1], x[2], x[3]]))]
+f_fun = Function[(x...) -> confidence(N([x[1], x[2], x[3]]))]
 {{jacobian}}
 sizes = [1]
 formula = parseformula("P_1")

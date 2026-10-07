@@ -1,8 +1,8 @@
 function insert_jacobian(x)
-    jacobian_expr = :(Df_fun = RowJacobianMatrix([x -> [confidence_1(DN(x[1:2]))..., 0, 0],
-                        x -> [confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))...],
-                        x -> [confidence_2(DN(x[1:2]))..., 0, 0],
-                        x -> [confidence_2(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))...]]))
+    jacobian_expr = :(Df_fun = RowJacobianMatrix([(x...) -> [confidence_1(DN(x[1:2]))..., 0, 0],
+                        (x...) -> [confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))...],
+                        (x...) -> [confidence_2(DN(x[1:2]))..., 0, 0],
+                        (x...) -> [confidence_2(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))...]]))
     if x == :({{jacobian}})
         return jacobian_expr
     else

@@ -1,4 +1,4 @@
-# Thanks to Francesc for this function!
+# Thanks to Francesc PIFARRE ESQUERDA for this function!
 function read_onnx_mlp(path::AbstractString)
     model = open(path) do io
         ONNX.ProtoBuf.decode(ONNX.ProtoBuf.ProtoDecoder(io), ONNX.ModelProto)

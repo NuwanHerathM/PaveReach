@@ -1,5 +1,5 @@
 function insert_jacobian(x)
-    jacobian_expr = :(Df_fun = RowJacobianMatrix([x -> [confidence(DN(IntervalBox([x[1], x[2], x[3]])))...]]))
+    jacobian_expr = :(Df_fun = RowJacobianMatrix([(x...) -> [confidence(DN(IntervalBox([x[1], x[2], x[3]])))...]]))
     if x == :({{jacobian}})
         return jacobian_expr
     else

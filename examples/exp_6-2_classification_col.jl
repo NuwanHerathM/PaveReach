@@ -1,5 +1,5 @@
 function insert_jacobian(x)
-    jacobian_expr = :(Df_fun = ColJacobianMatrix(collect(x -> [confidence(dN(x[1:p], i))] for i in 1:p)))
+    jacobian_expr = :(Df_fun = ColJacobianMatrix(collect((x...) -> [confidence(dN(i, x[1:p]))] for i in 1:p)))
     if x == :({{jacobian}})
         return jacobian_expr
     else

@@ -26,7 +26,7 @@ parsed_args = parse_commandline()
 # Set the problem
 
 p = 3
-f_fun = Function[x -> (2.5*sin(x[3]) - x[1])^2 + (2.5*cos(x[3]) - x[2])^2]
+f_fun = Function[(x...) -> (2.5*sin(x[3]) - x[1])^2 + (2.5*cos(x[3]) - x[2])^2]
 {{jacobian}}
 sizes = [1]
 formula = parseformula("P_1")

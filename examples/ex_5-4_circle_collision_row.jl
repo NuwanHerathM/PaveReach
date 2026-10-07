@@ -1,5 +1,5 @@
 function insert_jacobian(x)
-    jacobian_expr = :(Df_fun = RowJacobianMatrix([x -> [(-2*(2.5*sin(x[3]) - x[1])), (-2*(2.5*cos(x[3]) - x[2])), (5*cos(x[3])*(2.5*sin(x[3]) - x[1]) - 5*sin(x[3])*(2.5*cos(x[3]) - x[2]))]]))
+    jacobian_expr = :(Df_fun = RowJacobianMatrix([(x...) -> [(-2*(2.5*sin(x[3]) - x[1])), (-2*(2.5*cos(x[3]) - x[2])), (5*cos(x[3])*(2.5*sin(x[3]) - x[1]) - 5*sin(x[3])*(2.5*cos(x[3]) - x[2]))]]))
     if x == :({{jacobian}})
         return jacobian_expr
     else

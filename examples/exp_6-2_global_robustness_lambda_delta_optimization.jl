@@ -1,10 +1,6 @@
-<<<<<<<< HEAD:examples/ex_5-5_robot_collision.jl
-include("../src/pave.jl")
-========
 include("../src/utils.jl")
 include("../src/pave.jl")
 include("../src/read_onnx.jl")
->>>>>>>> cav:examples/exp_6-2_global_robustness_lambda_delta_optimization.jl
 
 using BenchmarkTools
 
@@ -98,14 +94,8 @@ end
 using TimerOutputs
 const to = TimerOutput()
 
-<<<<<<<< HEAD:examples/ex_5-5_robot_collision.jl
 @btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
-========
-@timeit to "pave" inn, out, delta = pave_monotonous_12(X_0, [1, -1], p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
-
-show(to)
->>>>>>>> cav:examples/exp_6-2_global_robustness_lambda_delta_optimization.jl
 
 if allow_exists_and_forall_bisection
     outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_refined.png"
@@ -119,7 +109,6 @@ if use_plots
     p = plot()
     draw(p, X_0, inn, out, delta)
     plot(p)
-<<<<<<<< HEAD:examples/ex_5-5_robot_collision.jl
     savefig(outfile)
     println("The result was saved in $(outfile).")
 end
@@ -133,16 +122,3 @@ if use_luxor
     finish()
     println("The result was saved in $(outfile).")
 end
-========
-
-    if allow_exists_and_forall_bisection
-        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_refined.png"
-    elseif allow_exists_or_forall_bisection
-        outfile = "$(filename)_$(ϵ_x)_$(ϵ_p)_subdivided.png"
-    else
-        outfile = "$(filename)_$(ϵ_x).png"
-    end
-    savefig(outfile)
-    println("The result was saved in $(outfile).")
-end
->>>>>>>> cav:examples/exp_6-2_global_robustness_lambda_delta_optimization.jl

@@ -550,12 +550,6 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
         for i in 1:(n_in)
             f_fun_in_i = (x...) -> f_inflated[i](x[1:p]...) - x[p+i]
             push!(f_fun_in, f_fun_in_i)
-            # for j in 1:p
-            #     Df_fun_in[i, j] = x -> Df_inflated[i, j](x[1:p])
-            # end
-            # for j in 1:(n_in)
-            #     Df_fun_in[i, p+j] = x -> Dz[i, j]
-            # end
         end
         Df_fun_in = append_constant(Df_inflated, Dz)
     else
@@ -606,12 +600,6 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
         for i in 1:(n_out)
             f_fun_out_i = (x...) -> f_inflated[i](x[1:p]...) - x[p+i]
             push!(f_fun_out, f_fun_out_i)
-            # for j in 1:p
-            #     Df_fun_out[i, j] = x -> Df_inflated[i, j](x[1:p])
-            # end
-            # for j in 1:(n_out)
-            #     Df_fun_out[i, p+j] = x -> Dz[i, j]
-            # end
         end
         Df_fun_out = append_constant(Df_inflated, Dz)
     else

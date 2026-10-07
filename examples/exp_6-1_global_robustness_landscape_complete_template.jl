@@ -7,7 +7,10 @@ using BenchmarkTools
 nnet = read_nnet("models/running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_jacobian(nnet, x)
-dN(x, i) = get_partial_derivative(nnet, i, x)
+dN(i, x) = get_partial_derivative(nnet, i, x)
+N(x::Tuple) = N(collect(x))
+DN(x::Tuple) = DN(collect(x))
+dN(i, x::Tuple) = dN(i, collect(x))
 
 # Define the confidence function
 
@@ -27,23 +30,11 @@ end
 # Set the problem
 
 p = 4
-f_fun = Function[x -> confidence_1(N(x[1:2])),
-        x -> confidence_1(N(perturbation(x[1:4]))),
-        x -> confidence_2(N(x[1:2])),
-        x -> confidence_2(N(perturbation(x[1:4])))]
-Df_fun = RowJacobianMatrix([x -> [confidence_1(DN(x[1:2]))..., 0, 0],
-        x -> [confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))...],
-        x -> [confidence_2(DN(x[1:2]))..., 0, 0],
-        x -> [confidence_2(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4]))...]])
-df_1(x) = [confidence_1(dN(x[1:2], 1)), confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 1]), confidence_1(dN(x[1:2], 1)), confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 1])]
-df_2(x) = [confidence_1(dN(x[1:2], 2)), confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 2]), confidence_1(dN(x[1:2], 2)), confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 2])]
-df_3(x) = [0, confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 3]), 0, confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 3])]
-df_4(x) = [0, confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 4]), 0, confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 4])]
-# df_1(x) = [confidence_1(dN(x[1:2], 1)), confidence_1(dN(perturbation(x[1:4]), 1)), confidence_1(dN(x[1:2], 1)), confidence_1(dN(perturbation(x[1:4]), 1))]
-# df_2(x) = [confidence_1(dN(x[1:2], 2)), confidence_1(dN(perturbation(x[1:4]), 2)), confidence_1(dN(x[1:2], 2)), confidence_1(dN(perturbation(x[1:4]), 2))]
-# df_3(x) = [0, confidence_1(dN(perturbation(x[1:4]), 1)), 0, confidence_1(dN(perturbation(x[1:4]), 1))]
-# df_4(x) = [0, confidence_1(dN(perturbation(x[1:4]), 2)), 0, confidence_1(dN(perturbation(x[1:4]), 2))]
-Df_fun = ColJacobianMatrix([df_1, df_2, df_3, df_4])
+f_fun = Function[(x...) -> confidence_1(N(x[1:2])),
+        (x...) -> confidence_1(N(perturbation(x[1:4]))),
+        (x...) -> confidence_2(N(x[1:2])),
+        (x...) -> confidence_2(N(perturbation(x[1:4])))]
+{{jacobian}}
 sizes = [1, 1, 1, 1]
 formula = parseformula("((¬ P_1) ∨ P_2) ∧ ((¬ P_3) ∨ P_4)")
 qvs = [(Forall, 3), (Forall, 4)]
