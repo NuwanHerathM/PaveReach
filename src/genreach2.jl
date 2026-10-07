@@ -1,5 +1,5 @@
 using IntervalArithmetic
-using Symbolics 
+using Symbolics
 using LazySets
 # using Polyhedra
 # using StaticArrays

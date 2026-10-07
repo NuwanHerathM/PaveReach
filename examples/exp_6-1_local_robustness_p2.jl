@@ -73,6 +73,11 @@ p_out = deepcopy(p_in)
 G = [interval(strict_epsilon, 100000)]
 
 # @btime(global inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
+if allow_exists_and_forall_bisection
+    refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+    refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+end
+
 inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)
 
 if parsed_args["save"]
