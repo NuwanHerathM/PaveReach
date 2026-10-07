@@ -1,5 +1,3 @@
-include("../src/utils.jl")
-
 @testset "ReLU derivative" begin
     @testset "Integers and floating point numbers" begin
         @test reluder(-1) == 0

@@ -1,11 +1,3 @@
-using Plots
-using Luxor
-using MathTeXEngine
-using LinearAlgebra
-
-include("genreach2.jl")
-include("quantifiedconstraintproblem.jl")
-
 const global minus_inf = -100000
 const global plus_inf = 100000
 const global strict_epsilon = 0.0001
@@ -358,10 +350,6 @@ function inflate(vector::AbstractVector, indices)
     return inflated
 end
 
-function inflate(matrix::AbstractMatrix, indices)
-    return stack(inflate(eachrow(matrix), indices), dims=1)
-end
-
 function is_zero_in(R, i)
     return !isempty(R[i]) && interval(0, 0) ⊆ interval(min(R[i]), max(R[i]))
 end
@@ -393,9 +381,9 @@ end
 function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         qvs_relaxed = get_qvs_relaxed(qcp)
-        quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
+        quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, length(X)+length(qvs_relaxed[j])+i) for i in 1:length(get_G(qcp))]] for j in eachindex(qvs_relaxed)]
         dirty_quantifiers_relaxed = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
-        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers_relaxed, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers_relaxed, length(get_G(qcp)), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_in(get_M(qcp), R_inner, get_positions_dict(qcp))
@@ -404,9 +392,9 @@ end
 
 function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
-        quantifiers = [[(Exists, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
+        quantifiers = [[(Exists, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, length(X)+length(get_qvs(qcp))+i) for i in 1:length(get_G(qcp))]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, length(get_G(qcp)), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_not_in(get_M(qcp), R_outer, get_positions_dict(qcp)) 
@@ -415,9 +403,9 @@ end
 
 function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
-        quantifiers = [[(Exists, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]]
+        quantifiers = [[(Exists, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, length(X)+length(get_qvs(qcp))+i) for i in 1:length(get_G(qcp))]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
-        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        R_outer = QEapprox_o0_outer(get_f(qcp), get_Df(qcp), dirty_quantifiers, length(get_G(qcp)), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_not_in(get_M(qcp), R_outer, get_positions_dict(qcp))
@@ -427,9 +415,9 @@ end
 function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         qvs_relaxed = get_qvs_relaxed(qcp)
-        quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, get_p(qcp)-i) for i in (get_n(qcp)-1):-1:0]] for j in 1:get_n(qcp)]
+        quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, length(X)+length(qvs_relaxed[j])+i) for i in 1:length(get_G(qcp))]] for j in eachindex(qvs_relaxed)]
         dirty_quantifiers_relaxed = quantifiedvariables2dirtyvariables.(quantifiers_relaxed)
-        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers_relaxed, get_p(qcp), get_n(qcp), [X.v; intervals; get_G(qcp)])
+        R_inner = QEapprox_o0_inner(get_f(qcp), get_Df(qcp), dirty_quantifiers_relaxed, length(get_G(qcp)), [X.v; intervals; get_G(qcp)])
         global NB_EVALUATIONS
         NB_EVALUATIONS += 1
         return test_zero_in(get_M(qcp), R_inner, get_positions_dict(qcp))
@@ -533,7 +521,6 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
     qvs = get_qvs(parameters)
     qvs_relaxed = get_qvs_relaxed(parameters)
     sizes = get_sizes(parameters)
-    n = get_n(parameters)
     p = get_p(parameters)
     
     G = get_G(domains)
@@ -541,29 +528,36 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
     ranges_dict = build_ranges_dict(M, sizes)
     
     M_in = expand(M, ranges_dict, G)
+    n_in = length(atoms(M_in))
     positions_in = duplication_positions(M, ranges_dict, G)
-    Δn_in = length(positions_in)
+    # Δn_in = length(positions_in)
     if userfunctions isa UserDefinedSymbolicFunctions
         variables = get_variables(userfunctions)
         f_num = get_f_num(userfunctions)
-        @variables z_in[n + Δn_in]
+        @variables z_in[1:n_in]
         f_num_in = inflate(f_num, positions_in)
-        for i in 1:(n + Δn_in)
+        for i in 1:(n_in)
             f_num_in[i] -= z_in[i]
         end
-        f_fun_in, Df_fun_in = build_function_f_Df(f_num_in, [variables; z_in], n + Δn_in, p + n + Δn_in)
+        f_fun_in, Df_fun_in = build_function_f_Df_2(f_num_in, [variables; z_in], n_in, p + n_in)
+        Df_fun_in = MatJacobianMatrix(Df_fun_in)
     elseif userfunctions isa UserDefinedFunctions
         f_inflated = inflate(get_f(userfunctions), positions_in)
         Df_inflated = inflate(get_Df(userfunctions), positions_in)
         f_fun_in = Function[]
-        Df_fun_in = Function[]
-        Dz = Matrix{Float64}(-LinearAlgebra.I, n + Δn_in, n + Δn_in)
-        for i in 1:(n + Δn_in)
-            f_fun_in_i = x -> f_inflated[i](x[1:p]) - x[p+i]
+        # Df_fun_in = Matrix{Function}(undef, n_in, p + n_in)
+        Dz = Matrix{Float64}(-LinearAlgebra.I, n_in, n_in)
+        for i in 1:(n_in)
+            f_fun_in_i = (x...) -> f_inflated[i](x[1:p]...) - x[p+i]
             push!(f_fun_in, f_fun_in_i)
-            Df_fun_in_i = x -> [Df_inflated[i](x[1:p])..., Dz[i,:]...]
-            push!(Df_fun_in, Df_fun_in_i)
+            # for j in 1:p
+            #     Df_fun_in[i, j] = x -> Df_inflated[i, j](x[1:p])
+            # end
+            # for j in 1:(n_in)
+            #     Df_fun_in[i, p+j] = x -> Dz[i, j]
+            # end
         end
+        Df_fun_in = append_constant(Df_inflated, Dz)
     else
         error("Unknown type of user-defined functions: $(typeof(userfunctions)).")
     end
@@ -572,7 +566,7 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
     positions_dict_in = build_positions_dict(M_in)
     problem_in = ExpandedProblem(M_in, f_fun_in, Df_fun_in, G_in, positions_dict_in)
     
-    return QuantifiedConstraintProblem(problem_in, qvs, qvs_relaxed_in, p + n + Δn_in, n + Δn_in)
+    return QuantifiedConstraintProblem(problem_in, qvs, qvs_relaxed_in)
 end
 
 function build_quantified_problem_out(parameters::ProblemParameters, domains, criterion)
@@ -583,7 +577,6 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
     qvs = get_qvs(parameters)
     qvs_relaxed = get_qvs_relaxed(parameters)
     sizes = get_sizes(parameters)
-    n = get_n(parameters)
     p = get_p(parameters)
     
     G = get_G(domains)
@@ -591,29 +584,36 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
     ranges_dict = build_ranges_dict(M, sizes)
     
     M_out = expand(M, ranges_dict, G)
+    n_out = length(atoms(M_out))
     positions_out = duplication_positions(M, ranges_dict, G)
-    Δn_out = length(positions_out)
+    # Δn_out = length(positions_out)
     if userfunctions isa UserDefinedSymbolicFunctions
         variables = get_variables(userfunctions)
         f_num = get_f_num(userfunctions)
-        @variables z_out[n + Δn_out]
+        @variables z_out[1:n_out]
         f_num_out = inflate(f_num, positions_out)
-        for i in 1:(n + Δn_out)
+        for i in 1:(n_out)
             f_num_out[i] -= z_out[i]
         end
-        f_fun_out, Df_fun_out = build_function_f_Df(f_num_out, [variables; z_out], n + Δn_out, p + n + Δn_out)
+        f_fun_out, Df_fun_out = build_function_f_Df_2(f_num_out, [variables; z_out], n_out, p + n_out)
+        Df_fun_out = MatJacobianMatrix(Df_fun_out)
     elseif userfunctions isa UserDefinedFunctions
         f_inflated = inflate(get_f(userfunctions), positions_out)
         Df_inflated = inflate(get_Df(userfunctions), positions_out)
         f_fun_out = Function[]
-        Df_fun_out = Function[]
-        Dz = Matrix{Float64}(-LinearAlgebra.I, n + Δn_out, n + Δn_out)
-        for i in 1:(n + Δn_out)
-            f_fun_out_i = x -> f_inflated[i](x[1:p]) - x[p+i]
+        # Df_fun_out = Matrix{Function}(undef, n_out, p + n_out)
+        Dz = Matrix{Float64}(-LinearAlgebra.I, n_out, n_out)
+        for i in 1:(n_out)
+            f_fun_out_i = (x...) -> f_inflated[i](x[1:p]...) - x[p+i]
             push!(f_fun_out, f_fun_out_i)
-            Df_fun_out_i = x -> [Df_inflated[i](x[1:p])..., Dz[i,:]...]
-            push!(Df_fun_out, Df_fun_out_i)
+            # for j in 1:p
+            #     Df_fun_out[i, j] = x -> Df_inflated[i, j](x[1:p])
+            # end
+            # for j in 1:(n_out)
+            #     Df_fun_out[i, p+j] = x -> Dz[i, j]
+            # end
         end
+        Df_fun_out = append_constant(Df_inflated, Dz)
     else
         error("Unknown type of user-defined functions: $(typeof(userfunctions)).")
     end
@@ -622,7 +622,7 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
     positions_dict_out = build_positions_dict(M_out)
     problem_out = ExpandedProblem(M_out, f_fun_out, Df_fun_out, G_out, positions_dict_out)
     
-    return QuantifiedConstraintProblem(problem_out, qvs, qvs_relaxed_out, p + n + Δn_out, n + Δn_out)
+    return QuantifiedConstraintProblem(problem_out, qvs, qvs_relaxed_out)
 end
 
 Precision = Union{T, Vector{T}} where T<:Real
@@ -680,7 +680,7 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     check_is_in = criterion_in == 1 ? check_is_in_1 : check_is_in_2
     check_is_out = criterion_out == 1 ? check_is_out_1 : check_is_out_2
     
-    n = get_n(parameters)
+    # n = get_n(parameters)
     p = get_p(parameters)
     
     qcp_in = build_quantified_problem_in(parameters, domains, criterion_in)

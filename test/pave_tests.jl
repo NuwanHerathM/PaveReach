@@ -1,5 +1,3 @@
-include("../src/pave.jl")
-
 box = IntervalBox(interval(0, 2), interval(40, 50))
 @testset "Bisect increasing / decreasing order" begin
     @testset "Dim 1" begin
@@ -156,9 +154,6 @@ end
 @testset "Inflate" begin
     @testset "Vector" begin
         @test inflate([7,6,3,5,0], [2,4]) == [7,6,6,3,5,5,0]
-    end
-    @testset "Matrix" begin
-        @test inflate([1 2; 7 6; 5 0], [1,3]) == [1 2; 1 2; 7 6; 5 0; 5 0]
     end
 end
 

@@ -1,4 +1,4 @@
-include("../src/pave.jl")
+include("../src/PaveReach.jl")
 
 filename = splitext(PROGRAM_FILE)[1]
 
