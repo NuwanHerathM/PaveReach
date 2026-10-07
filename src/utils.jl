@@ -1,6 +1,3 @@
-using LazySets, IntervalArithmetic, LinearAlgebra
-using NeuralVerification
-
 """
     reluder(x)
 
@@ -80,20 +77,39 @@ function affine_map(layer::NeuralVerification.Layer, z::AbstractVector)
     return result
 end
 
-function get_gradient(nnet::Network, x::AbstractVector)
+"""
+    Compute the Jacobian J(x) = (∂f_j/∂x_i(x))_{i,j} for a neural network f: R^N → R^M. The output is a M * N matrix.
+"""
+function get_jacobian(nnet::Network, x::AbstractVector)
     z = x
-    gradient = Matrix(1.0LinearAlgebra.I, length(x), length(x))
+    jacobian = Matrix(1.0LinearAlgebra.I, length(x), length(x))
     for layer in nnet.layers
         z_hat = affine_map(layer, z)
         m_gradient = act_gradient(layer.activation, z_hat)
-        gradient = Diagonal(m_gradient) * layer.weights * gradient
+        jacobian = Diagonal(m_gradient) * layer.weights * jacobian
         z = layer.activation(z_hat)
     end
-    return gradient
+    return jacobian
 end
 
-function get_gradient(nnet::Network, box::IntervalBox)
-    return get_gradient(nnet, box.v)
+function get_jacobian(nnet::Network, box::IntervalBox)
+    return get_jacobian(nnet, box.v)
+end
+
+"""
+    Compute the partial derivative ∂f/∂x_i(x) = (∂f_j/∂x_i(x))_j for a neural network f: R^N → R^M. The output is vector of length M.
+"""
+function get_partial_derivative(nnet::Network, i::Int, x::AbstractVector)
+    z = x
+    partial_derivative = zeros(length(x))
+    partial_derivative[i] = 1.0
+    for layer in nnet.layers
+        z_hat = affine_map(layer, z)
+        m_gradient = act_gradient(layer.activation, z_hat)
+        partial_derivative = Diagonal(m_gradient) * layer.weights * partial_derivative
+        z = layer.activation(z_hat)
+    end
+    return partial_derivative
 end
 
 function has_flat_content(a::T) where T <: AbstractArray

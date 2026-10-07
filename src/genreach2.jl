@@ -259,29 +259,48 @@ function IZon(lin, k, n)
   return LazySets.Interval(-abs(lin[1,k]),abs(lin[1,k]))   
 end
 
+# function build_function_f_Df(f_num, x, n::Int, p::Int)
+#   f_fun = Function[]
+#   Df_fun = Function[]
+#   for j in 1:n
+#     f_expr = build_function(f_num[j], [x[i] for i=1:p])
+#     push!(f_fun, eval(f_expr))
+    
+#     Df = Symbolics.jacobian([f_num[j]], [x[i] for i=1:p])
+#     Df_expr = build_function(Df, [x[i] for i=1:p])
+#     @show Df_expr
+#     push!(Df_fun, eval(Df_expr[1]))
+#   end
+#   return f_fun, Df_fun
+# end
+
 function build_function_f_Df(f_num, x, n::Int, p::Int)
   f_fun = Function[]
-  Df_fun = Function[]
-  for j in 1:n
-    f_expr = build_function(f_num[j], [x[i] for i=1:p])
+  for i in 1:n
+    f_expr = build_function(f_num[i], x...)
     push!(f_fun, eval(f_expr))
-    
-    Df = Symbolics.jacobian([f_num[j]], [x[i] for i=1:p])
-    Df_expr = build_function(Df, [x[i] for i=1:p])
-    push!(Df_fun, eval(Df_expr[1]))
+  end
+  Df_fun = Matrix{Function}(undef, n, p)
+  Df_num = Symbolics.jacobian(f_num, x)
+  for i in 1:n
+    for j in 1:p
+      Df_expr = build_function(Df_num[i, j], x...)
+      Df_fun[i, j] = eval(Df_expr)
+    end
   end
   return f_fun, Df_fun
 end
 
-function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers_relaxed, p, n, input)
+function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers_relaxed, n, input)
   global inn = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
 
-  radii = [IntervalArithmetic.radius(input[i]) for i=1:p]
-  input_center = [mid(input[i]) for i=1:p]
-   
+  p = length(input)
+  radii = IntervalArithmetic.radius.(input)
+  input_center = mid.(input)
+  
   for j in 1:n
-    c = Base.invokelatest(g_fun[j],input_center)
-    range_Dg = Base.invokelatest(Dg_fun[j],input)
+    c = Base.invokelatest(g_fun[j],input_center...)
+    range_Dg = Base.invokelatest(get_gradient(Dg_fun, j),input...)
 
     inner = interval(c,c)
   
@@ -306,15 +325,16 @@ function QEapprox_o0_inner(g_fun, Dg_fun, quantifiers_relaxed, p, n, input)
   return inn
 end
 
-function QEapprox_o0_outer(g_fun, Dg_fun, quantifiers, p, n, input)
+function QEapprox_o0_outer(g_fun, Dg_fun, quantifiers, n, input)
   global out = [] #LazySets.Interval(0.0,0.0) for k = 1:n] 
 
-  radii = [IntervalArithmetic.radius(input[i]) for i=1:p]
-  input_center = [mid(input[i]) for i=1:p]
-   
+  p = length(input)
+  radii = IntervalArithmetic.radius.(input)
+  input_center = mid.(input)
+  
   for j in 1:n
-    c = Base.invokelatest(g_fun[j],input_center)
-    range_Dg = Base.invokelatest(Dg_fun[j],input)
+    c = Base.invokelatest(g_fun[j],input_center...)
+    range_Dg = Base.invokelatest(get_gradient(Dg_fun, j),input...)
 
     outer = interval(c,c)
     

@@ -9,7 +9,7 @@ Paving of a set describing a quantified constraint problem, using general reacha
 ## Gist of the program
 
 ```julia
-include("pave.jl")
+include("PaveReach.jl")
 ...
 inn, out, delta = pave_11(...)
 ```
@@ -26,7 +26,7 @@ For the different paving functions, see [Oracles](#oracles).
 
 `PaveReach` relies on `GenReach` ([repo](https://github.com/goubault/GenReach)). In the present prototype, the file `genreach.jl` from `GenReach` has been copied, altered and renamed `genreach2.jl`.
 
-#### List of the packages
+#### List of the package dependencies
 
 For `GenReach`
 * `IntervalArithmetic` v0.21.2
@@ -34,18 +34,19 @@ For `GenReach`
 * `Symbolics` v6.31.0
 
 For `PaveReach`
-* `Match` v2.4.1
-* `Plots` v1.41.5
 * `ArgParse` v1.2.0
-* `LaTeXStrings` v1.4.0
 * `BenchmarkTools` v1.6.3
+* `LaTeXStrings` v1.4.0
 * `Luxor` v4.3.0
+* `Match` v2.4.1
 * `MathTeXEngine` v0.6.7
 * `NeuralVerification` v0.1.0
 * `ONNX` v0.3.0
-* `SoleLogics` v0.13.7
-* `ReusePatterns` v0.3.1
 * `Pandas` v1.6.1
+* `Plots` v1.41.5
+* `ReusePatterns` v0.3.1
+* `StaticArrays` v1.9.16
+* `SoleLogics` v0.13.7
 
 #### Adding a package
 
@@ -72,7 +73,7 @@ To return to the `julia>` prompt, either press backspace when the input line is 
 
 ### Quick start
 
-#### Try a toy example
+#### Try a toy example: a star/shuriken-like shape
 
 Move into the `examples/` folder.
 
@@ -102,6 +103,15 @@ Move into the `examples/` folder.
 Run:
 ```
 julia ex_0-0_disk.jl
+```
+
+#### The toy example with user defined Jacobian
+
+Move into the `examples/` folder.
+
+Run:
+```
+julia ex_0-2_star.jl
 ```
 
 <!-- #### Try a 2D toy example
@@ -235,9 +245,10 @@ sizes = ...
 qvs = ...
 # Relaxed quantified variables
 qvs_relaxed_1 = ...
-qvs_relaxed_2 = ...
+...
+qvs_relaxed_m = ...
 # Problem parameters
-parameters = ProblemParameters(formula, x, f_num, sizes, qvs, [qvs_relaxed_1, qvs_relaxed_2], p)
+parameters = ProblemParameters(formula, x, f_num, sizes, qvs, [qvs_relaxed_1, ..., qvs_relaxed_m], p)
 # Problem domains
 P = ...
 G = ...
@@ -312,6 +323,42 @@ More information on the `@variables` macro can be found [here](https://symbolics
 > [!CAUTION]
 > `z_in` and `z_out` are global variables already used by `PaveReach`.
 
+<!-- > [!NOTE]
+> The current implementation constructs the Jacobian as a `RowJacobianMatrix`, which is not the prefered option (cf. the [dedicated section](#user-definition-of-the-functions)). -->
+
+## User definition of the functions
+
+When one chooses to explicitly give the functions that represent the problem, one also has to give the `JacobianMatrix`. For $f: \mathbb{R}^N \to \mathbb{R}^M$, there are three options.
+
+> [!TIP]
+> This first option should be prefered whenever possible.
+
+A set of $M \times N$ real-valued functions $\partial{f_j}/\partial{x_i}$.
+```julia
+MatJacobianMatrix(matrix::AbstractMatrix)
+```
+```julia
+df_ij = (x...) -> ...
+```
+
+A set of $M \times 1$ vector-valued functions $\partial{f_j}/\partial{x} = \nabla{f_i}$.
+```julia
+RowJacobianMatrix(matrix::AbstractMatrix)
+RowJacobianMatrix(vector::AbstractVector)
+```
+```julia
+df_j = (x...) -> [...]
+```
+
+A set of $1 \times N$ vector-valued functions $\partial{f}/\partial{x_i}$.
+```julia
+ColJacobianMatrix(matrix::AbstractMatrix)
+ColJacobianMatrix(vector::AbstractVector)
+```
+```julia
+df_i = (x...) -> [...]
+```
+
 ## Problem
 
 We characterize the set
@@ -339,7 +386,7 @@ ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{N
 * When you have the functions and their gradients:
 `ProblemParameters` takes the formula `M`, the functions `f`, the Jacobian `Df`, the dimensions of the codomains `sizes`, the quantifiers `qvs` for the bounded variables, the relaxed variables `qvs_relaxed` and the number of variables `p`.
 ```julia
-ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::Vector{Function}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
 ```
 
 ### Problem domains

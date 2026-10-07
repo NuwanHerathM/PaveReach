@@ -1,5 +1,3 @@
-include("../src/quantifiedconstraintproblem.jl")
-
 @testset "Get indices" begin
     sizes = [2, 3, 4]
     @test collect(build_ranges(sizes)) == [1:2, 3:5, 6:9]

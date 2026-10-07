@@ -1,6 +1,3 @@
-using ONNX
-using NeuralVerification
-
 # Thanks to Francesc for this function!
 function read_onnx_mlp(path::AbstractString)
     model = open(path) do io

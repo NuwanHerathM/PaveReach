@@ -1,3 +1,4 @@
+include("../src/PaveReach.jl")
 using Test
 
 @testset "My tests" begin
@@ -12,5 +13,9 @@ using Test
 
     @testset "Utils tests" begin
         include("utils_tests.jl")
+    end
+
+    @testset "Jacobian tests" begin
+        include("jacobianmatrix_tests.jl")
     end
 end

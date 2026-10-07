@@ -1,4 +1,4 @@
-include("../src/pave.jl")
+include("../src/PaveReach.jl")
 
 # Set the problem
 
