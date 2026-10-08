@@ -19,37 +19,37 @@ function bisect_eps(interval, ϵ)
     return parts
 end
 
-function bisect_eps_quantifier!(intervals, qvs, eps, p, quantifier)
+function bisect_eps_quantifier!(intervals, qvs, eps, shift, quantifier)
     @assert sum(length.(intervals); init=0) ==  length(intervals) "Each interval should be a single interval."
-    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - length(qvs))
+    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- shift
 
     for i in pos_quantifier
         intervals[i] = bisect_eps(intervals[i][1], eps[i])
     end
 end
 
-bisect_eps_exists!(intervals, qvs, eps, p) = bisect_eps_quantifier!(intervals, qvs, eps, p, Exists)
-bisect_eps_forall!(intervals, qvs, eps, p) = bisect_eps_quantifier!(intervals, qvs, eps, p, Forall)
+bisect_eps_exists!(intervals, qvs, eps, shift) = bisect_eps_quantifier!(intervals, qvs, eps, shift, Exists)
+bisect_eps_forall!(intervals, qvs, eps, shift) = bisect_eps_quantifier!(intervals, qvs, eps, shift, Forall)
 
-function pointify_quantifier!(intervals, qvs, p, quantifier)
-    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- (p - length(qvs))
+function pointify_quantifier!(intervals, qvs, shift, quantifier)
+    pos_quantifier = [i for (q, i) in qvs if q == quantifier] .- shift
 
     for i in pos_quantifier
         intervals[i] = interval.(mid.(intervals[i]))
     end
 end
 
-pointify_exists!(intervals, qvs, p) = pointify_quantifier!(intervals, qvs, p, Exists)
-pointify_forall!(intervals, qvs, p) = pointify_quantifier!(intervals, qvs, p, Forall)
+pointify_exists!(intervals, qvs, shift) = pointify_quantifier!(intervals, qvs, shift, Exists)
+pointify_forall!(intervals, qvs, shift) = pointify_quantifier!(intervals, qvs, shift, Forall)
 
-function refine_in!(P_in, qvs, eps, p)
-    bisect_eps_exists!(P_in, qvs, eps, p)
-    pointify_exists!(P_in, qvs, p)
+function refine_in!(P_in, qvs, eps, shift)
+    bisect_eps_exists!(P_in, qvs, eps, shift)
+    pointify_exists!(P_in, qvs, shift)
 end
 
-function refine_out!(P_out, qvs, eps, p)
-    bisect_eps_forall!(P_out, qvs, eps, p)
-    pointify_forall!(P_out, qvs, p)
+function refine_out!(P_out, qvs, eps, shift)
+    bisect_eps_forall!(P_out, qvs, eps, shift)
+    pointify_forall!(P_out, qvs, shift)
 end
 
 # function bisect_largest!(intervals)
@@ -691,8 +691,8 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     allow_exists_and_forall_bisection = get_allow_exists_and_forall_bisection(configuration)
 
     if allow_exists_and_forall_bisection
-        refine_in!(P_in, get_qvs(parameters), ϵ_p, p)
-        refine_out!(P_out, get_qvs(parameters), ϵ_p, p)
+        refine_in!(P_in, get_qvs(parameters), ϵ_p, X_length)
+        refine_out!(P_out, get_qvs(parameters), ϵ_p, X_length)
     end
 
     P_in_0 = deepcopy(P_in)
@@ -865,41 +865,61 @@ end
 Pave the input box X, when each component of X is monotonous with respect to the set membership relation.
 Faster than pave_monotonous_sides, but relies on a heuristic that may produce additional undecided boxes. (This behavior is obvious when the input domain X_0 is totally inside or outside the set.)
 """
-function pave_monotonous_mid(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out) where {N, T<:Real}
-    @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
-    @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
+function pave_monotonous_mid(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, parameters, domains, configuration, criterion_in, criterion_out, verbose=true) where {N, T<:Real}
     @assert length(optimization_directions) == length(X) "Length of optimization_directions must be equal to the number of variables in X."
-    @assert length(G) == qcp.n "Length of G must be equal to the number of functions, n = $(qcp.n)."
-    @assert length(X) + length(p_in) + length(G) == qcp.p "Total number of variables, in X and p_in, must be equal to p - n = $(qcp.p - qcp.n)."
-    @assert length(qcp.qvs) == length(p_in) "Number of quantified variables must be equal to the number of parameter boxes, $(length(p_in))."
-    for qv in qcp.qvs
-        @assert length(X) < index(qv) <= length(X) + length(p_in) "Quantified variables must be in the parameter space: indices between $(length(X)+1) and $(qcp.p - qcp.n)."
+    X_length = length(X)
+    P_length = length(get_P(domains))
+    @assert X_length + P_length == get_p(parameters) "Total number of variables, in X and p_in, must be equal to p = $(get_p(parameters))."
+    @assert length(get_qvs(parameters)) == P_length "Number of quantified variables must be equal to the number of parameter."
+    for qv in get_qvs(parameters)
+        @assert X_length < index(qv) <= X_length + P_length "Quantified variables must be in the parameter space: indices between $(X_length+1) and $(X_length+P_length))."
     end
-    for qvs in qcp.qvs_relaxed
-        @assert length(qvs) == length(p_in) "Number of quantified variables must be equal to the number of parameter boxes, $(length(p_in))."
+    for qvs in get_qvs_relaxed(parameters)
+        @assert length(qvs) == length(get_P(domains)) "Number of quantified variables must be equal to the number of parameter boxes, $(P_length)."
         for qv in qvs
-            @assert length(X) < index(qv) <= length(X) + length(p_in) "Quantified variables must be in the parameter space: indices between $(length(X)+1) and $(qcp.p - qcp.n)."
+            @assert X_length < index(qv) <= X_length + P_length "Quantified variables must be in the parameter space: indices between $(X_length+1) and $(X_length+P_length)."
         end
     end
-    inn = []
-    p_in_0 = deepcopy(p_in)
-    p_out_0 = deepcopy(p_out)
-    p_in_diams= IntervalArithmetic.diam.(first.(p_in))
-    p_out_diams = IntervalArithmetic.diam.(first.(p_out))
-    if any(map(<=, ϵ_p, p_in_diams))
+    check_is_in = criterion_in == 1 ? check_is_in_1 : check_is_in_2
+    check_is_out = criterion_out == 1 ? check_is_out_1 : check_is_out_2
+    
+    p = get_p(parameters)
+    
+    qcp_in = build_quantified_problem_in(parameters, domains, criterion_in)
+    qcp_out = build_quantified_problem_out(parameters, domains, criterion_out)
+    
+    P = get_P(domains)
+    P_in = [[interval] for interval in P]
+    P_out = deepcopy(P_in)
+
+    ϵ_x = get_ϵ_x(configuration)
+    @assert length(ϵ_x) == X_length "Length of ϵ_x must be equal to the number of variables in X: $(X_length)."
+    ϵ_p = get_ϵ_p(configuration)
+    @assert isempty(ϵ_p) || length(ϵ_p) == P_length "Length of ϵ_p must be equal to the number of parameters: $(P_length)."
+    allow_exists_or_forall_bisection = get_allow_exists_or_forall_bisection(configuration)
+    allow_exists_and_forall_bisection = get_allow_exists_and_forall_bisection(configuration)
+
+    # P_in_0 = deepcopy(P_in)
+    # P_out_0 = deepcopy(P_out)
+    P_in_diams = IntervalArithmetic.diam.(first.(P_in))
+    P_out_diams = IntervalArithmetic.diam.(first.(P_out))
+    if any(map(<=, ϵ_p, P_in_diams))
         # bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
-        bisect_eps_forall!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+        bisect_eps_forall!(P_in, get_qvs(qcp_in), ϵ_p, X_length)
     end
-    if any(map(<=, ϵ_p, p_out_diams))
+    if any(map(<=, ϵ_p, P_out_diams))
         # bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
-        bisect_eps_exists!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+        bisect_eps_exists!(P_out, get_qvs(qcp_out), ϵ_p, X_length)
     end
+
     inn = []
     out = []
     delta = []
-    queue = [(X, p_in, p_out)]
-    while !isempty(queue)
-        X, p_in, p_out = pop!(queue)
+    stack = [(X, P_in, P_out)]
+    global NB_EVALUATIONS
+    NB_EVALUATIONS = 0
+    while !isempty(stack)
+        X, P_in, P_out = pop!(stack)
         if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
             error("TO DO")
         end
@@ -909,28 +929,34 @@ function pave_monotonous_mid(X::IntervalArithmetic.IntervalBox{N, T}, optimizati
                 continue
             end
             dim_slice, X_slice = bisection_slice(X, ϵ_x)
-            if check_is_in(X_slice, p_in, G, qcp)
+            if check_is_in(X_slice, P_in, qcp_in)
                 bisect_in_optimization_direction = create_bisect_in_optimization_direction(optimization_directions[dim_slice])
-                X_inn, X_queue = bisect_in_optimization_direction(X, dim_slice)
+                X_inn, X_stack = bisect_in_optimization_direction(X, dim_slice)
                 push!(inn, X_inn)
-                push!(queue, (X_queue, p_in, p_out))
-            elseif check_is_out(X_slice, p_out, G, qcp)
+                push!(stack, (X_stack, P_in, P_out))
+            elseif check_is_out(X_slice, P_out, qcp_out)
                 bisect_in_optimization_direction = create_bisect_in_optimization_direction(optimization_directions[dim_slice])
-                X_queue, X_out = bisect_in_optimization_direction(X, dim_slice)
+                X_stack, X_out = bisect_in_optimization_direction(X, dim_slice)
                 push!(out, X_out)
-                push!(queue, (X_queue, p_in, p_out))
+                push!(stack, (X_stack, P_in, P_out))
             else
                 X_1, X_2, _ = bisect_precision(X, ϵ_x)
-                push!(queue, (X_1, p_in, p_out))
-                push!(queue, (X_2, p_in, p_out))
+                push!(stack, (X_1, P_in, P_out))
+                push!(stack, (X_2, P_in, P_out))
             end
         end
         if allow_exists_or_forall_bisection
             error("TO DO")
         end
     end
+    if verbose
+        println("Paving completed.")
+        println("\tNumber of evaluations: $NB_EVALUATIONS")
+    end
     return inn, out, delta
 end
+
+pave_monotonous_mid_12(X, optimization_directions, parameters, domains, configuration, verbose=true) = pave_monotonous_mid(X, optimization_directions, parameters, domains, configuration, 1, 2, verbose)
 
 function backward_bound(interval, sign)
     if sign > 0
@@ -950,7 +976,7 @@ end
 
 function slice(box, optimization_directions, dim, directed_function)
     l = []
-
+    
     for i in 1:length(box)
         if i == dim
             directed_value = directed_function(box[dim], optimization_directions[dim])
@@ -959,7 +985,7 @@ function slice(box, optimization_directions, dim, directed_function)
             push!(l, box[i])
         end
     end
-
+    
     return IntervalBox(l)
 end
 
@@ -969,7 +995,7 @@ forward_slice(box, optimization_directions, dim) = slice(box, optimization_direc
 function slices(box, optimization_directions, unchanged_face, directed_slicing_function)
     l = []
     for i in 1:length(box)
-        if !isnothing(unchanged_face) && i == dim(unchanged_face) && bound(directed_slicing_function, optimization_directions[i]) == bound(unchanged_face)
+        if !isempty(unchanged_face) && i == dim(unchanged_face) && bound(directed_slicing_function, optimization_directions[i]) == bound(unchanged_face)
             continue
         end
         push!(l, directed_slicing_function(box, optimization_directions, i))
@@ -982,15 +1008,16 @@ end
     Lower
 end
 
-Face = Tuple{Int, Bound}
-
-function dim(face::Face)
-    return face[1]
+struct Face
+    dim::Int
+    bound::Bound
 end
 
-function bound(face::Face)
-    return face[2]
-end
+dim(face::Face) = face.dim
+bound(face::Face) = face.bound
+
+emptyface() = Face(-1, Upper)
+Base.isempty(face::Face) = face.dim == -1
 
 function bound(f, sign)
     if f == forward_slice && sign == 1
@@ -1014,71 +1041,92 @@ forward_slices(box, optimization_directions, unchanged_face) = slices(box, optim
 Pave the input box X, when each component of X is monotonous with respect to the set membership relation.
 Slower than pave_monotonous_mid, but does not produce unexpected undecided boxes.
 """
-function pave_monotonous_sides_optimized(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in, check_is_out) where {N, T<:Real}
-    @assert ((allow_exists_and_forall_bisection || allow_exists_or_forall_bisection) && !isnothing(ϵ_p)) || (!allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection) "ϵ_p must be provided when bisection on parameter space is allowed."
-    @assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
+function pave_monotonous_sides_optimized(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, parameters, domains, configuration, criterion_in, criterion_out, verbose=true) where {N, T<:Real}
     @assert length(optimization_directions) == length(X) "Length of optimization_directions must be equal to the number of variables in X."
-    @assert length(G) == qcp.n "Length of G must be equal to the number of functions, n = $(qcp.n)."
-    @assert length(X) + length(p_in) + length(G) == qcp.p "Total number of variables, in X and p_in, must be equal to p - n = $(qcp.p - qcp.n)."
-    @assert length(qcp.qvs) == length(p_in) "Number of quantified variables must be equal to the number of parameter boxes, $(length(p_in))."
-    for qv in qcp.qvs
-        @assert length(X) < index(qv) <= length(X) + length(p_in) "Quantified variables must be in the parameter space: indices between $(length(X)+1) and $(qcp.p - qcp.n)."
+    X_length = length(X)
+    P_length = length(get_P(domains))
+    @assert X_length + P_length == get_p(parameters) "Total number of variables, in X and p_in, must be equal to p = $(get_p(parameters))."
+    @assert length(get_qvs(parameters)) == P_length "Number of quantified variables must be equal to the number of parameter."
+    for qv in get_qvs(parameters)
+        @assert X_length < index(qv) <= X_length + P_length "Quantified variables must be in the parameter space: indices between $(X_length+1) and $(X_length+P_length))."
     end
-    for qvs in qcp.qvs_relaxed
-        @assert length(qvs) == length(p_in) "Number of quantified variables must be equal to the number of parameter boxes, $(length(p_in))."
+    for qvs in get_qvs_relaxed(parameters)
+        @assert length(qvs) == length(get_P(domains)) "Number of quantified variables must be equal to the number of parameter boxes, $(P_length)."
         for qv in qvs
-            @assert length(X) < index(qv) <= length(X) + length(p_in) "Quantified variables must be in the parameter space: indices between $(length(X)+1) and $(qcp.p - qcp.n)."
+            @assert X_length < index(qv) <= X_length + P_length "Quantified variables must be in the parameter space: indices between $(X_length+1) and $(X_length+P_length)."
         end
     end
-    inn = []
-    p_in_0 = deepcopy(p_in)
-    p_out_0 = deepcopy(p_out)
-    p_in_diams= IntervalArithmetic.diam.(first.(p_in))
-    p_out_diams = IntervalArithmetic.diam.(first.(p_out))
-    if any(map(<=, ϵ_p, p_in_diams))
+    check_is_in = criterion_in == 1 ? check_is_in_1 : check_is_in_2
+    check_is_out = criterion_out == 1 ? check_is_out_1 : check_is_out_2
+    
+    p = get_p(parameters)
+    
+    qcp_in = build_quantified_problem_in(parameters, domains, criterion_in)
+    qcp_out = build_quantified_problem_out(parameters, domains, criterion_out)
+    
+    P = get_P(domains)
+    P_in = [[interval] for interval in P]
+    P_out = deepcopy(P_in)
+    
+    ϵ_x = get_ϵ_x(configuration)
+    @assert length(ϵ_x) == X_length "Length of ϵ_x must be equal to the number of variables in X: $(X_length)."
+    ϵ_p = get_ϵ_p(configuration)
+    @assert isempty(ϵ_p) || length(ϵ_p) == P_length "Length of ϵ_p must be equal to the number of parameters: $(P_length)."
+    allow_exists_or_forall_bisection = get_allow_exists_or_forall_bisection(configuration)
+    allow_exists_and_forall_bisection = get_allow_exists_and_forall_bisection(configuration)
+    
+    # P_in_0 = deepcopy(P_in)
+    # P_out_0 = deepcopy(P_out)
+    P_in_diams = IntervalArithmetic.diam.(first.(P_in))
+    P_out_diams = IntervalArithmetic.diam.(first.(P_out))
+    if any(map(<=, ϵ_p, P_in_diams))
         # bisect_largest_forall!(p_in, qcp.qvs, qcp.p, qcp.n)
-        bisect_eps_forall!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+        bisect_eps_forall!(P_in, get_qvs(qcp_in), ϵ_p, X_length)
     end
-    if any(map(<=, ϵ_p, p_out_diams))
+    if any(map(<=, ϵ_p, P_out_diams))
         # bisect_largest_exists!(p_out, qcp.qvs, qcp.p, qcp.n)
-        bisect_eps_exists!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
+        bisect_eps_exists!(P_out, get_qvs(qcp_out), ϵ_p, X_length)
     end
     inn = []
     out = []
     delta = []
-    stack = Tuple{IntervalArithmetic.IntervalBox, Union{Face, Nothing}, Vector{Vector{IntervalArithmetic.Interval}}, Vector{Vector{IntervalArithmetic.Interval}}}[]
-    push!(stack, (X, nothing, p_in, p_out))
-    while !isempty(stack)
-        X, unchanged_face, p_in, p_out = popfirst!(stack)
+    queue = [(X, emptyface(), P_in, P_out)]
+    global NB_EVALUATIONS
+    NB_EVALUATIONS = 0
+    while !isempty(queue)
+        X, unchanged_face, P_in, P_out = popfirst!(queue)
         if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
             error("TO DO")
         end
         if allow_exists_and_forall_bisection
             backward_X_slices = backward_slices(X, optimization_directions, unchanged_face)
             forward_X_slices = forward_slices(X, optimization_directions, unchanged_face)
-            if any(check_is_in(X_slice, p_in, G, qcp) for X_slice in forward_X_slices)
+            if any(check_is_in(X_slice, P_in, qcp_in) for X_slice in forward_X_slices)
                 push!(inn, X)
-            elseif any(check_is_out(X_slice, p_out, G, qcp) for X_slice in backward_X_slices)
+            elseif any(check_is_out(X_slice, P_out, qcp_out) for X_slice in backward_X_slices)
                 push!(out, X)
             elseif all(map(<, IntervalArithmetic.diam.(X), ϵ_x))
                 push!(delta, X)
             else
                 X_1, X_2, dim = bisect_precision(X, ϵ_x)
-                unchanged_face_1 = (dim, Lower)
-                unchanged_face_2 = (dim, Upper)
-                push!(stack, (X_1, unchanged_face_1, p_in, p_out))
-                push!(stack, (X_2, unchanged_face_2, p_in, p_out))
+                unchanged_face_1 = Face(dim, Lower)
+                unchanged_face_2 = Face(dim, Upper)
+                push!(queue, (X_1, unchanged_face_1, P_in, P_out))
+                push!(queue, (X_2, unchanged_face_2, P_in, P_out))
             end
         end
         if allow_exists_or_forall_bisection
             error("TO DO")
         end
     end
+    if verbose
+        println("Paving completed.")
+        println("\tNumber of evaluations: $NB_EVALUATIONS")
+    end
     return inn, out, delta
 end
 
-pave_monotonous_mid_12(X, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave_monotonous_mid(X, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_1, check_is_out_2)
-pave_monotonous_sides_optimized_12(X, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) = pave_monotonous_sides_optimized(X, optimization_directions, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection, check_is_in_1, check_is_out_2)
+pave_monotonous_sides_optimized_12(X, optimization_directions, parameters, domains, configuration, verbose=true) = pave_monotonous_sides_optimized(X, optimization_directions, parameters, domains, configuration, 1, 2, verbose)
 
 # Utils
 
