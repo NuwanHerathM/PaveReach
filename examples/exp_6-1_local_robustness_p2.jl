@@ -51,7 +51,7 @@ configuration = PavingConfiguration(ϵ_x)
 # Pave
 
 verbose = false
-benchmark = @benchmarkset (global inn, out, delta = pave_12(X_0, parameters, domains, configuration, verbose)) samples=1 evals=1
+benchmark = @benchmarkable (global inn, out, delta = pave_12(X_0, parameters, domains, configuration, verbose)) samples=1 evals=1
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 

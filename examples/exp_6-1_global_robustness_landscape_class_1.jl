@@ -2,6 +2,25 @@ include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
+# ------------------------------------------------------
+using ArgParse
+
+function parse_commandline()
+    s = ArgParseSettings()
+
+    @add_arg_table s begin
+        "delta"
+            help = "confidence delta"
+            arg_type = Float64
+            required = true
+    end
+
+    return parse_args(s)
+end
+
+parsed_args = parse_commandline()
+# ------------------------------------------------------
+
 # Load the neural network
 
 nnet = read_nnet("models/running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
@@ -45,7 +64,7 @@ parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, 
 X_0 = IntervalBox(interval(-1, 1), interval(-1, 1))
 ϵ_max = 1/8
 P = [interval(-ϵ_max, ϵ_max), interval(-ϵ_max, ϵ_max)]
-δ = 1/8
+δ = parsed_args["delta"]
 G = [interval(δ + strict_epsilon, plus_inf), interval(strict_epsilon, plus_inf)]
 domains = ProblemDomains(P, G)
 
