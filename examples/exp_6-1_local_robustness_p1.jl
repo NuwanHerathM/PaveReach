@@ -46,7 +46,10 @@ G = [interval(strict_epsilon, 100000)]
 domains = ProblemDomains(P, G)
 
 ϵ_x = [0.05]
-configuration = PavingConfiguration(ϵ_x)
+ϵ_p = [0.1, 0.1]
+allow_exists_or_forall_bisection = false
+allow_exists_and_forall_bisection = true
+configuration = PavingConfiguration(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
 
 # Pave
 
@@ -57,7 +60,7 @@ timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milli
 
 # Save the paving in a .png file
 
-base = "$(filename)_$(input_x)_$(input_y)_$(ϵ_x)"
+base = "$(filename)_$(input_x)_$(input_y)_$(ϵ_x)_$(ϵ_p)_refined"
 
 outfile = base * ".png"
 save_drawing(X_0, inn, out, delta, outfile)
