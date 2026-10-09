@@ -1,6 +1,4 @@
-include("../src/utils.jl")
-include("../src/pave.jl")
-include("../src/read_onnx.jl")
+include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
@@ -30,32 +28,18 @@ end
 
 parsed_args = parse_commandline()
 # ------------------------------------------------------
-ϵ_x = [0.1, 0.1]
-ϵ_p = [0.01, 1]
-allow_exists_and_forall_bisection = parsed_args["refine"]
-allow_exists_or_forall_bisection = parsed_args["subdivide"]
 
-if isnothing(ϵ_p)
-    @assert !allow_exists_and_forall_bisection "eps_p was not provided. Refinement requires eps_p. Use --help for more information."
-    @assert !allow_exists_or_forall_bisection "eps_p was not provided. Subdivision requires eps_p. Use --help for more information."
-else
-    if !allow_exists_and_forall_bisection && !allow_exists_or_forall_bisection
-        @warn "eps_p was provided, but will not be used. Provide options --refine or --subdivide in order to use eps_p."
-    end
-end
-@assert nand(allow_exists_and_forall_bisection, allow_exists_or_forall_bisection) "Refinement and subdivision are mutually exclusive. Use --help for more information."
+# Load the neural network
 
-use_plots = parsed_args["with_plots"]
-use_luxor = parsed_args["with_luxor"]
-
-@assert nand(use_plots, use_luxor) "Plots and Luxor are mutually exclusive. Use --help for more information."
-# ------------------------------------------------------
-
-filename = splitext(PROGRAM_FILE)[1]
-
-nnet = read_onnx_mlp("normed_etcs_2x250_nodes.onnx")
+nnet = read_onnx_mlp("models/normed_etcs_2x250_nodes.onnx")
 N(x) = NeuralVerification.compute_output(nnet, x)
-DN(x) = get_gradient(nnet, x)
+DN(x) = get_jacobian(nnet, x)
+dN(i, x) = get_partial_derivative(nnet, i, x)
+N(x::Tuple) = N(collect(x))
+DN(x::Tuple) = DN(collect(x))
+dN(i, x::Tuple) = dN(i, collect(x))
+
+# Define the confidence function
 
 confidence(vect::AbstractVector) = vect[1] - vect[2]
 confidence(mat::Matrix) = mat[1, :] - mat[2, :]
@@ -70,55 +54,59 @@ function perturbation(x)
 end
 
 function gradient_perturbation(x)
-    return [x[4] 0 1 x[1]; 0 0 0 0; 0 0 0 0]
+    return [x[4] 0 1 x[1];
+            0 0 0 0;
+            0 0 0 0]
 end
 
-n = 2
-p = 6
-f_fun = [x -> (confidence(N([x[3], x_h, x_r])) - x[2] - x[5]), x -> (confidence(N(perturbation(x[1:4]))) - x[6])]
-Df_fun = [x -> [0 -1 confidence(DN(IntervalBox([x[3], x_h, x_r])) * gradient_variables)... 0 -1 0],
-        x -> [confidence(DN(IntervalBox(perturbation(x[1:4]))) * gradient_perturbation(x[1:4]))... 0 -1]]
-problem = Problem(f_fun, Df_fun, [[1], [2]])
+# Set the problem
+# { λ, δ ∣ ∀ v, ∀ ϵ, confidence(N(v, x_h, x_r)) > δ ⟹ confidence(N(v + λϵ, x_h, x_r)) > 0 }
+
+p = 4
+# x[1] = λ, x[2] = δ, x[3] = v, x[4] = ϵ
+f_fun = Function[(x...) -> confidence(N([x[3], x_h, x_r])) - x[2],
+            (x...) -> confidence(N(perturbation(x[1:4])))]
+Df_fun = RowJacobianMatrix([(x...) -> [0, -1, confidence(DN(IntervalBox([x[3], x_h, x_r])) * gradient_variables)..., 0],
+            (x...) -> [confidence(DN(IntervalBox(perturbation(x[1:4]))) * gradient_perturbation(x[1:4]))...]])
+Df_fun = ColJacobianMatrix([(x...) -> [0, confidence(dN())]])
+sizes = [1, 1]
+formula = parseformula("(¬ P_1) ∨ P_2")
 qvs = [(Forall, 3), (Forall, 4)]
-qcp = QuantifiedConstraintProblem(problem, qvs, [qvs, qvs], p, n)
+qvs_relaxed = [qvs, qvs]
+parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
 X_0 = IntervalBox(interval(0, 1), interval(0, 1))
-p_in = [[interval(100/149, 1)], [interval(-0.013, 0.013)]]
-p_out = deepcopy(p_in)
-G = [interval(minus_inf, -strict_epsilon), interval(strict_epsilon, plus_inf)]
+P = [interval(100/149, 1), interval(-0.013, 0.013)]
+G = [interval(strict_epsilon, plus_inf), interval(strict_epsilon, plus_inf)]
+domains = ProblemDomains(P, G)
 
-if allow_exists_and_forall_bisection
-    refine_in!(p_in, qcp.qvs, ϵ_p, qcp.p, qcp.n)
-    refine_out!(p_out, qcp.qvs, ϵ_p, qcp.p, qcp.n)
-end
+ϵ_x = [0.1, 0.1]
+ϵ_p = [0.01, 1]
+allow_exists_and_forall_bisection = parsed_args["refine"]
+allow_exists_or_forall_bisection = parsed_args["subdivide"]
+configuration  = PavingConfiguration(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
 
-using TimerOutputs
-const to = TimerOutput()
+# Pave
 
-@btime (global inn, out, delta = pave_11(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection)) samples=10
+inn, out, delta = pave_11(X_0, parameters, domains, configuration)
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
+# results = run(benchmark)
+# timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
+# Save the paving in .png file
+
+filename = splitext(PROGRAM_FILE)[1]
 if allow_exists_and_forall_bisection
-    outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_refined.png"
+    base = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_refined"
 elseif allow_exists_or_forall_bisection
-    outfile = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_subdivided.png"
+    base = "$(filename)_11_$(ϵ_x)_$(ϵ_p)_subdivided"
 else
-    outfile = "$(filename)_11_$(ϵ_x).png"
+    base = "$(filename)_11_$(ϵ_x)"
 end
 
-if use_plots
-    p = plot()
-    draw(p, X_0, inn, out, delta)
-    plot(p)
-    savefig(outfile)
-    println("The result was saved in $(outfile).")
-end
+outfile = base * ".png"
+save_drawing(X_0, inn, out, delta, outfile)
 
-if use_luxor
-    width = 600
-    height = 600
-    buffer = 50
-    Drawing(width + 2*buffer, height + 2*buffer, outfile)
-    luxor_draw(X_0, inn, out, delta, width, height, buffer)
-    finish()
-    println("The result was saved in $(outfile).")
-end
+# Save the timing in a log file
+
+logfile = base * ".log"
+save_log(timing, logfile)

@@ -6,10 +6,10 @@ function insert_jacobian(x)
     # df_4(x...) = [0, confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 4]), 0, confidence_1(DN(perturbation(x[1:4])) * gradient_perturbation(x[1:4])[:, 4])]
     # Formula in practice
     jacobian_expr = :(
-        df_1(x...) = [confidence_1(dN(1, x[1:2])), confidence_1(dN(1, perturbation(x[1:4]))), confidence_1(dN(1, x[1:2])), confidence_1(dN(1, perturbation(x[1:4])))];
-        df_2(x...) = [confidence_1(dN(2, x[1:2])), confidence_1(dN(2, perturbation(x[1:4]))), confidence_1(dN(2, x[1:2])), confidence_1(dN(2, perturbation(x[1:4])))];
-        df_3(x...) = [0, confidence_1(dN(1, perturbation(x[1:4]))), 0, confidence_1(dN(1, perturbation(x[1:4])))];
-        df_4(x...) = [0, confidence_1(dN(2, perturbation(x[1:4]))), 0, confidence_1(dN(2, perturbation(x[1:4])))];
+        df_1(x...) = [confidence_1(dN(1, x[1:2])), confidence_1(dN(1, perturbation(x[1:4]))), confidence_2(dN(1, x[1:2])), confidence_2(dN(1, perturbation(x[1:4])))];
+        df_2(x...) = [confidence_1(dN(2, x[1:2])), confidence_1(dN(2, perturbation(x[1:4]))), confidence_2(dN(2, x[1:2])), confidence_2(dN(2, perturbation(x[1:4])))];
+        df_3(x...) = [0, confidence_1(dN(1, perturbation(x[1:4]))), 0, confidence_2(dN(1, perturbation(x[1:4])))];
+        df_4(x...) = [0, confidence_1(dN(2, perturbation(x[1:4]))), 0, confidence_2(dN(2, perturbation(x[1:4])))];
         Df_fun = ColJacobianMatrix([df_1, df_2, df_3, df_4]))
     if x == :({{jacobian}})
         return jacobian_expr

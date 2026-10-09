@@ -38,15 +38,21 @@ configuration = PavingConfiguration(ϵ_x)
 
 # Pave
 
-benchmark = @benchmarkable (global inn, out, delta = pave_12(X_0, parameters, domains, configuration)) samples=1 evals=1
+verbose = false
+benchmark = @benchmarkable (global inn, out, delta = pave_12(X_0, parameters, domains, configuration, verbose)) samples=1 evals=1
 results = run(benchmark)
-timing = round(median(results).time/1e6, digits=3)
-@info "Time (ms)" t=timing
+timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
 # Save the paving in .png file
 
 filename = splitext(PROGRAM_FILE)[1]
-outfile = "$(filename)_$(δ)_$(ϵ_x).png"
+base = "$(filename)_$(δ)_$(ϵ_x)"
 
 xticks = (25, 149)
+outfile = base * ".png"
 save_drawing(X_0, inn, out, delta, outfile, xticks)
+
+# Save the timing in a log file
+
+logfile = base * ".log"
+save_log(timing, logfile)

@@ -92,7 +92,9 @@ function append_constant(CJ::ColJacobianMatrix{S}, Z::AbstractMatrix{T}) where {
     _, m = size(Z)
     # @assert
     matrix = Matrix{Function}(undef, 1, S + m)
-    matrix[1, 1:S] = CJ.matrix
+    for j in 1:S
+        matrix[1, j] = (x...) -> CJ.matrix[1, j](x[1:S]...)
+    end
     for j in 1:m
         matrix[1, S + j] = (x...) -> Z[:, j]
     end
