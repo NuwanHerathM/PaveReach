@@ -109,7 +109,7 @@ end
 
 increment!(indices, lengths, pos) = increment!(indices, lengths, pos, 0)
 
-function complement(x::IntervalArithmetic.Interval{T}) where T <: Real
+function complement(x::IntervalArithmetic.Interval{T}) where T <: AbstractFloat
     l = []
     if x.lo != minus_inf
         push!(l, interval(minus_inf, x.lo - strict_epsilon))
@@ -121,11 +121,11 @@ function complement(x::IntervalArithmetic.Interval{T}) where T <: Real
 end
 
 "Custom version of isbounded to handle pseudo_infinity values."
-function is_bounded(interval::IntervalArithmetic.Interval{T}) where T <: Real
+function is_bounded(interval::IntervalArithmetic.Interval{T}) where T <: AbstractFloat
     return !isempty(interval) && interval.lo != minus_inf && interval.hi != plus_inf
 end
 
-function is_bounded(intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Real
+function is_bounded(intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: AbstractFloat
     return all(is_bounded, intervals)
 end
 
@@ -137,7 +137,7 @@ function atom_conjunction(atom::Atom, n::Int)
     return ∧(conjuncted_predicates...)
 end
 
-function atom_complement_disjunction(atom::Atom, intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: Real
+function atom_complement_disjunction(atom::Atom, intervals::Vector{IntervalArithmetic.Interval{T}}) where T <: AbstractFloat
     if length(intervals) == 1
         interval = first(intervals)
         if is_bounded(interval)
@@ -169,7 +169,7 @@ function atom_complement_disjunction(atom::Atom, intervals::Vector{IntervalArith
     end
 end
 
-function expand_1(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms) where T <: Real
+function expand_1(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms) where T <: AbstractFloat
     if M isa Atom
         indices = indices_dict[M.value]
         n_indices = last(indices) - first(indices) + 1
@@ -194,7 +194,7 @@ end
 
 expand_1(M, indices_dict, intervals) = expand_1(M, indices_dict, intervals, atoms(M))
 
-function expand_2(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms, previous_token=nothing) where T <: Real
+function expand_2(M, indices_dict, intervals::Vector{IntervalArithmetic.Interval{T}}, atoms, previous_token=nothing) where T <: AbstractFloat
     if M isa Atom
         if previous_token != ¬
             range = indices_dict[M.value]
@@ -321,7 +321,7 @@ function complement_ranges_2(M, indices_dict)
     return ranges
 end
 
-function expand_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}, ranges::Vector{UnitRange{Int}}) where T <: Real
+function expand_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}, ranges::Vector{UnitRange{Int}}) where T <: AbstractFloat
     positions = vcat(map(collect, ranges)...)
     expanded_intervals = IntervalArithmetic.Interval{T}[]
     for i in 1:length(intervals)
@@ -378,7 +378,7 @@ function test_zero_not_in(M, R, positions_dict)
     end
 end
 
-function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
+function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         qvs_relaxed = get_qvs_relaxed(qcp)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, length(X)+length(qvs_relaxed[j])+i) for i in 1:length(get_G(qcp))]] for j in eachindex(qvs_relaxed)]
@@ -390,7 +390,7 @@ function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
     end
 end
 
-function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
+function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, length(X)+length(get_qvs(qcp))+i) for i in 1:length(get_G(qcp))]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -401,7 +401,7 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
     end
 end
 
-function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
+function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, length(X)+length(get_qvs(qcp))+i) for i in 1:length(get_G(qcp))]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -412,7 +412,7 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
     end
 end
 
-function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:Real}
+function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         qvs_relaxed = get_qvs_relaxed(qcp)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, length(X)+length(qvs_relaxed[j])+i) for i in 1:length(get_G(qcp))]] for j in eachindex(qvs_relaxed)]
@@ -428,7 +428,7 @@ end
 #     return [f[i]([X.v..., interval...]) for i in 1:length(f)]
 # end
 
-function check_is_in(X_0, P_in::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: Real
+function check_is_in(X_0, P_in::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: AbstractFloat
     @assert criterion == 1 || criterion == 2
 
     indices_forall = [i for (q, i) in get_qvs(qcp) if q == Forall] .- length(X_0)
@@ -468,7 +468,7 @@ end
 check_is_in_1(X_0, P_in, qcp) = check_is_in(X_0, P_in, qcp, 1)
 check_is_in_2(X_0, P_in, qcp) = check_is_in(X_0, P_in, qcp, 2)
 
-function check_is_out(X_0, P_out::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: Real
+function check_is_out(X_0, P_out::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: AbstractFloat
     @assert criterion == 1 || criterion == 2
 
     indices_forall = [i for (q, i) in get_qvs(qcp) if q == Forall] .- length(X_0)
@@ -656,7 +656,7 @@ function Base.show(io::IO, configuration::PavingConfiguration)
     print(io, if configuration.allow_exists_or_forall_bisection "Normal bisection on P" else "No standard bisection on P" end)
 end
 
-function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, configuration, criterion_in, criterion_out, verbose=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:Real}
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, configuration, criterion_in, criterion_out, verbose=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:AbstractFloat}
     X_length = length(X)
     P_length = length(get_P(domains))
     @assert X_length + P_length == get_p(parameters) "Total number of variables, in X and P, must be equal to p = $(get_p(parameters))."
@@ -698,6 +698,10 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     P_in_0 = deepcopy(P_in)
     P_out_0 = deepcopy(P_out)
 
+    println("Paving of the following domain")
+    display(X)
+    println("Target domain")
+    display(get_G(domains))
     inn = []
     out = []
     delta = []
@@ -816,7 +820,8 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     return inn, out, delta
 end
 
-pave(X::IntervalArithmetic.Interval{T}, parameters, domains, configuration, verbose=true) where T <: Real = pave(IntervalBox(X), parameters, domains, configuration, verbose)
+pave(X::AbstractVector{IntervalArithmetic.Interval{T}}, parameters, domains, configuration, verbose=true) where T <: AbstractFloat = pave(IntervalBox(X), parameters, domains, configuration, verbose)
+pave(X::IntervalArithmetic.Interval{T}, parameters, domains, configuration, verbose=true) where T <: AbstractFloat = pave([X], parameters, domains, configuration, verbose)
 
 pave_11(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 1, verbose)
 pave_12(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 2, verbose)
@@ -865,7 +870,7 @@ end
 Pave the input box X, when each component of X is monotonous with respect to the set membership relation.
 Faster than pave_monotonous_sides, but relies on a heuristic that may produce additional undecided boxes. (This behavior is obvious when the input domain X_0 is totally inside or outside the set.)
 """
-function pave_monotonous_mid(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, parameters, domains, configuration, criterion_in, criterion_out, verbose=true) where {N, T<:Real}
+function pave_monotonous_mid(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, parameters, domains, configuration, criterion_in, criterion_out, verbose=true) where {N, T<:AbstractFloat}
     @assert length(optimization_directions) == length(X) "Length of optimization_directions must be equal to the number of variables in X."
     X_length = length(X)
     P_length = length(get_P(domains))
@@ -1041,7 +1046,7 @@ forward_slices(box, optimization_directions, unchanged_face) = slices(box, optim
 Pave the input box X, when each component of X is monotonous with respect to the set membership relation.
 Slower than pave_monotonous_mid, but does not produce unexpected undecided boxes.
 """
-function pave_monotonous_sides_optimized(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, parameters, domains, configuration, criterion_in, criterion_out, verbose=true) where {N, T<:Real}
+function pave_monotonous_sides_optimized(X::IntervalArithmetic.IntervalBox{N, T}, optimization_directions, parameters, domains, configuration, criterion_in, criterion_out, verbose=true) where {N, T<:AbstractFloat}
     @assert length(optimization_directions) == length(X) "Length of optimization_directions must be equal to the number of variables in X."
     X_length = length(X)
     P_length = length(get_P(domains))

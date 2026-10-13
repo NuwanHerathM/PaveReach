@@ -100,6 +100,7 @@ end
     Compute the partial derivative ∂f/∂x_i(x) = (∂f_j/∂x_i(x))_j for a neural network f: R^N → R^M. The output is vector of length M.
 """
 function get_partial_derivative(nnet::Network, i::Int, x::AbstractVector)
+    @assert eltype(x) != Real "The vector should either be composed of floating point numbers or of interval, but not a mix of both."
     z = x
     partial_derivative = zeros(length(x))
     partial_derivative[i] = 1.0

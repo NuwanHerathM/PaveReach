@@ -223,15 +223,35 @@ save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, filename, xti
 
 # Logging
 
-function save_log(time, filename)
-    outdir = "outputs/"
+function create_outdir(outdir)
     if !isdir(outdir)
         mkdir(outdir)
         println("Created $(outdir).")
     end
+end
+
+function save_log(time, filename)
+    outdir = "outputs/"
+    create_outdir(outdir)
+
     filepath = outdir * filename
     open(filepath, "w") do io
         println(io, time)
     end
     println("The time was saved in $(filepath).")
+end
+
+function save_log(time, inn, out, delta, filename)
+    outdir = "outputs/"
+    create_outdir(outdir)
+
+    filepath = outdir * filename
+    open(filepath, "w") do io
+        println(io, "Time (ms):")
+        println(io, time)
+        println(io, "Number of boxes in inn: $(length(inn))")
+        println(io, "Number of boxes in out: $(length(out))")
+        println(io, "Number of boxes in delta: $(length(delta))")
+    end
+    println("Paving information was saved in $(filepath).")
 end
