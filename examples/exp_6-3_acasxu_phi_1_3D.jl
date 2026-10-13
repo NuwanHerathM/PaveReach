@@ -74,7 +74,7 @@ parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, 
 X = [interval(55947.0, 60760.0), interval(-π, π), interval(0.0, 60.0)]
 X_0 = [normalize_input(1, X[1]), normalize_input(2, X[2]), normalize_input(5, X[3])]
 P = []
-G = [interval(minus_inf, 3.991125645861615)]
+G = [interval(minus_inf, normalize_output(1500.0) - strict_epsilon)]
 domains = ProblemDomains(P, G)
 
 ϵ_x = [0.01, 0.005, 0.01]
