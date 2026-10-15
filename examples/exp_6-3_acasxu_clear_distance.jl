@@ -2,6 +2,25 @@ include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
+# ------------------------------------------------------
+using ArgParse
+
+function parse_commandline()
+    s = ArgParseSettings()
+
+    @add_arg_table s begin
+        "eps"
+            help = "precision epsilon of the paving"
+            arg_type = Float64
+            required = true
+    end
+
+    return parse_args(s)
+end
+
+parsed_args = parse_commandline()
+# ------------------------------------------------------
+
 # Load the neural network
 
 # ACAS Xu model from the Reluplex paper
@@ -58,7 +77,7 @@ function normalize_output(value)
 end
 
 # Set the problem
-# ρ ∈ [0, 60760] ∣ N_1(ρ, 0, 0, 1000, 600) ≤ 22
+# ρ ∈ [0, 10000] ∣ N_1(ρ, 0, 0, 1000, 600) ≤ 22
 
 p = 1
 θ = 0.0
@@ -73,14 +92,14 @@ formula = parseformula("P_1")
 qvs = QuantifiedVariable[]
 qvs_relaxed = [qvs]
 parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
-X = interval(0.0, 60760.0)
+X = interval(0.0, 10000.0)
 X_0 = normalize_input(1, X)
 P = []
 δ = 22
 G = [interval(minus_inf, normalize_output(δ))]
 domains = ProblemDomains(P, G)
 
-ϵ_x = [0.0001]
+ϵ_x = [parsed_args["eps"]]
 configuration = PavingConfiguration(ϵ_x)
 
 # Pave
@@ -90,12 +109,15 @@ benchmark = @benchmarkable (global inn, out, delta = pave(X_0, parameters, domai
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
+println("Undecided percentage")
+println("Δ / X_0: ", round(volume_boxes(delta) / volume_box(X_0) * 100; digits=2), "%")
+
 # Save the paving in .png file
 
 filename = splitext(PROGRAM_FILE)[1]
 base = "$(filename)_$(ϵ_x)"
 
-xticks = (0, 60760)
+xticks = (0, 10000)
 outfile = base * ".png"
 save_drawing(X_0, inn, out, delta, outfile, xticks)
 

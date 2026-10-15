@@ -58,7 +58,7 @@ function normalize_output(value)
 end
 
 # Set the problem
-# ρ ∈ [0, 60760] ∣ N_1(ρ, 0, 0, 1000, 600) ≤ 22 ⟹ N_1(ρ, 0, 0, 1000, 600 - 10) ≤ 22.5
+# ρ ∈ [0, 10000] ∣ N_1(ρ, 0, 0, 1000, 600) ≤ 22 ⟹ N_1(ρ, 0, 0, 1000, 600 - 10) ≤ 22.5
 
 p = 1
 θ = 0.0
@@ -74,7 +74,7 @@ formula = parseformula("(¬ P_1) ∨ P_2")
 qvs = QuantifiedVariable[]
 qvs_relaxed = [qvs]
 parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
-X = interval(0.0, 60760.0)
+X = interval(0.0, 10000.0)
 X_0 = normalize_input(1, X)
 P = []
 δ_1 = 22
@@ -92,12 +92,15 @@ benchmark = @benchmarkable (global inn, out, delta = pave(X_0, parameters, domai
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
+println("Undecided percentage")
+println("Δ / X_0: ", round(volume_boxes(delta) / volume_box(X_0) * 100; digits=2), "%")
+
 # Save the paving in .png file
 
 filename = splitext(PROGRAM_FILE)[1]
 base = "$(filename)_$(ϵ_x)"
 
-xticks = (0, 60760)
+xticks = (0, 10000)
 outfile = base * ".png"
 save_drawing(X_0, inn, out, delta, outfile, xticks)
 
