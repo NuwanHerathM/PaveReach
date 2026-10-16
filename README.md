@@ -233,9 +233,8 @@ optional arguments:
 
 Required information is aggregated into `ProblemParameters` and `ProblemDomains`.
 ```julia
-p = 2
+p = ...
 @variables x[1:p]
-...
 # f
 f_num = ...
 # Formula
@@ -255,6 +254,15 @@ G = ...
 domains = ProblemDomains(P, G)
 ```
 See the examples and [Problem parameters](#problem-parameters) for further details.
+
+Paving discretization has to be configured.
+```julia
+ϵ_x = [...]
+ϵ_p = [...]
+allow_exists_or_forall_bisection = true | false
+allow_exists_and_forall_bisection = true | false
+configuration = PavingConfiguration(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
+```
 
 #### For a scalar-valued function
 
@@ -291,10 +299,10 @@ The first two variables correspond to the free variables, $x$ and $y$, of the 2D
 
 Select one of the four paving functions according to this table
 
-|   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $M$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $\neg M$
+|   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $M^\top$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $M^\bot$
 |---|---|---
-| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $M$                  | `pave_11` | `pave_12`
-| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $\neg M$ | `pave_21` | `pave_22`
+| $\mathcal{O}^{IN}$ using $\mathbb{P}$ and $M^\top$                  | `pave_11` | `pave_12`
+| $\mathcal{O}^{IN}$ using $\neg\mathbb{P}$ and $M^\bot$ | `pave_21` | `pave_22`
 
 > [!NOTE]
 > The user does not have to construct $\neg\mathbb{P}$ or $\neg M$. The four paving functions take $\mathbb{P}$ and $M$ as input, so swapping between the functions amounts only to changing the name of the function.
