@@ -698,10 +698,12 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     P_in_0 = deepcopy(P_in)
     P_out_0 = deepcopy(P_out)
 
-    println("Paving of the following domain")
-    display(X)
-    println("Target domain")
-    display(get_G(domains))
+    if verbose
+        println("Paving of the following domain")
+        display(X)
+        println("Target domain")
+        display(IntervalBox(get_G(domains)))
+    end
     inn = []
     out = []
     delta = []

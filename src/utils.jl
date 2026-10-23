@@ -1,13 +1,75 @@
-function volume_box(box)
-    return prod(IntervalArithmetic.diam.(box))
+"""
+    volume_box(box, [scale...])
+
+Compute the volume of an `IntervalArithmetic.IntervalBox` or `IntervalArithmetic.Interval` with optional scaling.
+
+# Examples
+```jldoctest
+julia> segment = interval(-2.0, 4.5);
+julia> box = IntervalBox(interval(-1.0, 2.0), interval(-40.0, -38.0));
+
+julia> volume_box(segment)
+6.5
+
+julia> volume_box(box)
+6.0
+
+julia> volume_box(segment, 2)
+13.0
+
+julia> volume_box(box, 0.5, 1.5)
+4.5
+
+julia> volume_box(box, [0.5, 1.5])
+4.5
+```
+"""
+function volume_box(box, scale...)
+    if length(scale) != 1 && length(box) != length(scale)
+        throw(DimensionMismatch("The number of intervals and the number of scaling factors must be equal."))
+    end
+    return prod(IntervalArithmetic.diam.(box) .* scale)
 end
 
-function volume_boxes(boxes)
+volume_box(box, scale::AbstractVector) = volume_box(box, scale...)
+volume_box(box) = volume_box(box, 1)
+
+"""
+    volume_boxes(boxes, [scale...])
+
+Compute the total volume of multiple `IntervalBox` or `Interval` objects with optional scaling.
+
+# Examples
+```jldoctest
+julia> segment_1 = interval(-2.0, 4.5);
+julia> segment_2 = interval(10.0, 11.5);
+julia> segments = [segment_1, segment_2];
+julia> box_1 = IntervalBox(interval(-1.0, 2.0), interval(-40.0, -38.0));
+julia> box_2 = IntervalBox(interval(0.0, 3.0), interval(-20.0, -10.0));
+julia> boxes = [box_1, box_2];
+
+julia> volume_boxes(segments)
+8.0
+
+julia> volume_boxes(boxes)
+36.0
+
+julia> volume_boxes(segments, 2)
+16.0
+
+julia> volume_boxes(boxes, 0.5, 1.5)
+27.0
+```
+"""
+function volume_boxes(boxes, scale...)
     if isempty(boxes)
         return 0
     end
-    return sum(volume_box.(boxes))
+    return sum(volume_box(box, scale...) for box in boxes)
 end
+
+volume_boxes(box, scale::AbstractVector) = volume_boxes(box, scale...)
+volume_boxes(box) = volume_boxes(box, 1)
 
 function merge_intervals(intervals)
     disconnected = deepcopy(intervals)
@@ -236,12 +298,15 @@ function save_log(time, filename)
 
     filepath = outdir * filename
     open(filepath, "w") do io
+        println(io, "Time (ms):")
         println(io, time)
     end
     println("The time was saved in $(filepath).")
 end
 
-function save_log(time, inn, out, delta, filename)
+pretty_round(value) = value < 1e6 ? round(value, digits=3) : round(value, sigdigits=3)
+
+function save_log(time, inn, out, delta, scale, filename)
     outdir = "outputs/"
     create_outdir(outdir)
 
@@ -249,9 +314,9 @@ function save_log(time, inn, out, delta, filename)
     open(filepath, "w") do io
         println(io, "Time (ms):")
         println(io, time)
-        println(io, "Number of boxes in inn: $(length(inn))")
-        println(io, "Number of boxes in out: $(length(out))")
-        println(io, "Number of boxes in delta: $(length(delta))")
+        println(io, "Volume of boxes in inn: $(pretty_round(volume_boxes(inn, scale)))")
+        println(io, "Volume of boxes in out: $(pretty_round(volume_boxes(out, scale)))")
+        println(io, "Volume of boxes in delta: $(pretty_round(volume_boxes(delta, scale)))")
     end
     println("Paving information was saved in $(filepath).")
 end

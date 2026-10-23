@@ -46,9 +46,9 @@ end
     @test backward_bound(a, 1) == 0
     @test forward_bound(a, 1) == 5
     optimization_directions = [-1, 1]
-    @test backward_slices(box, optimization_directions, nothing) == [IntervalBox(interval(2, 2), interval(40, 50)), IntervalBox(interval(0, 2), interval(40, 40))]
-    @test forward_slices(box, optimization_directions, nothing) == [IntervalBox(interval(0, 0), interval(40, 50)), IntervalBox(interval(0, 2), interval(50, 50))]
-    unchanged_face = (2, Lower)
+    @test backward_slices(box, optimization_directions, emptyface()) == [IntervalBox(interval(2, 2), interval(40, 50)), IntervalBox(interval(0, 2), interval(40, 40))]
+    @test forward_slices(box, optimization_directions, emptyface()) == [IntervalBox(interval(0, 0), interval(40, 50)), IntervalBox(interval(0, 2), interval(50, 50))]
+    unchanged_face = Face(2, Lower)
     @test backward_slices(box, optimization_directions, unchanged_face) == [IntervalBox(interval(2, 2), interval(40, 50))]
     @test forward_slices(box, optimization_directions, unchanged_face) == [IntervalBox(interval(0, 0), interval(40, 50)), IntervalBox(interval(0, 2), interval(50, 50))]
 end

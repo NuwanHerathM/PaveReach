@@ -11,6 +11,10 @@ using Test
         include("quantifiedconstraintproblem_tests.jl")
     end
 
+    @testset "Neural network derivation tests" begin
+        include("neuralnetworkderivation_tests.jl")
+    end
+
     @testset "Utils tests" begin
         include("utils_tests.jl")
     end

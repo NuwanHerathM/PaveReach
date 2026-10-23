@@ -1,27 +1,36 @@
-@testset "ReLU derivative" begin
-    @testset "Integers and floating point numbers" begin
-        @test reluder(-1) == 0
-        @test reluder(-0.256) == 0
-        @test_throws DomainError reluder(0)
-        @test reluder(1) == 1
-        @test reluder(7.3) == 1
+@testset "Volume" begin
+    @testset "Single box / interval" begin
+        segment = interval(-2.0, 4.5)
+        box = IntervalBox(interval(-1.0, 2.0), interval(-40.0, -38.0))
+        @testset "Standard" begin
+            @test volume_box(segment) == 6.5
+            @test volume_box(box) == 6.0
+        end
+        @testset "With scaling" begin
+            @test volume_box(segment, 2) == 13.0
+            @test volume_box(segment, [2]) == 13.0
+            @test_throws DimensionMismatch volume_box(segment, [2, 3])
+            @test_throws DimensionMismatch volume_box(box, 2)
+            @test_throws DimensionMismatch volume_box(box, [2])
+            @test volume_box(box, 0.5, 1.5) == 4.5
+            @test volume_box(box, [0.5, 1.5]) == 4.5
+        end
     end
-    @testset "Intervals" begin
-        @test reluder(interval(-1, -0.5)) == interval(0, 0)
-        @test reluder(interval(-1, 0)) == interval(0, 0)
-        @test reluder(interval(-1, 1)) == interval(0, 1)
-        @test reluder(interval(0, 1)) == interval(1, 1)
-        @test reluder(interval(0.5, 1)) == interval(1, 1)
-        @test reluder(interval(0, 0)) == interval(1, 1)
+    @testset "List of boxes / intervals" begin
+        segments = [interval(-2.0, 4.5), interval(10.0, 11.5)]
+        boxes = [IntervalBox(interval(-1.0, 2.0), interval(-40.0, -38.0)), IntervalBox(interval(0.0, 3.0), interval(-20.0, -10.0))]
+        @testset "Standard" begin
+            @test volume_boxes(segments) == 8.0
+            @test volume_boxes(boxes) == 36.0
+        end
+        @testset "With scaling" begin
+            @test volume_boxes(segments, 2) == 16.0
+            @test volume_boxes(segments, [2]) == 16.0
+            @test_throws DimensionMismatch volume_boxes(segments, [2, 3])
+            @test_throws DimensionMismatch volume_boxes(boxes, 2)
+            @test_throws DimensionMismatch volume_boxes(boxes, [2])
+            @test volume_boxes(boxes, 0.5, 1.5) == 27.0
+            @test volume_boxes(boxes, [0.5, 1.5]) == 27.0
+        end
     end
-end
-
-@testset "Has a flat content" begin
-    @test has_flat_content([1, 2, 3]) == true
-    @test has_flat_content([1 2 3; 4 5 6]) == false
-    @test has_flat_content([1]) == true
-    @test has_flat_content([[[1]], [[2]]]) == true
-    @test has_flat_content(reshape(1:6, (2, 3))) == false
-    @test has_flat_content(reshape(1:6, (6, 1))) == true
-    @test_throws AssertionError has_flat_content(Array{Int}(undef, 0, 3))
 end
