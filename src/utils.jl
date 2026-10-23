@@ -292,31 +292,52 @@ function create_outdir(outdir)
     end
 end
 
-function save_log(time, filename)
-    outdir = "outputs/"
-    create_outdir(outdir)
-
-    filepath = outdir * filename
-    open(filepath, "w") do io
-        println(io, "Time (ms):")
-        println(io, time)
-    end
-    println("The time was saved in $(filepath).")
+function write_time(io, time)
+    println(io, "Time (ms):")
+    println(io, time)
 end
 
 pretty_round(value) = value < 1e6 ? round(value, digits=3) : round(value, sigdigits=3)
 
-function save_log(time, inn, out, delta, scale, filename)
+function write_volumes(io, inn, out, delta, scale)
+    println(io, "Volume of boxes in inn: $(pretty_round(volume_boxes(inn, scale)))")
+    println(io, "Volume of boxes in out: $(pretty_round(volume_boxes(out, scale)))")
+    println(io, "Volume of boxes in delta: $(pretty_round(volume_boxes(delta, scale)))")
+end
+
+function write_ratio(io, X_0, delta)
+    println(io, "Undecided percentage (normalized domain)")
+    println(io, "Δ / X_0: ", round(volume_boxes(delta) / volume_box(X_0) * 100; digits=2), "%")
+end
+
+function _save_log_setup(filename)
     outdir = "outputs/"
     create_outdir(outdir)
+    return outdir * filename
+end
 
-    filepath = outdir * filename
+function save_log(time, filename)
+    filepath = _save_log_setup(filename)
     open(filepath, "w") do io
-        println(io, "Time (ms):")
-        println(io, time)
-        println(io, "Volume of boxes in inn: $(pretty_round(volume_boxes(inn, scale)))")
-        println(io, "Volume of boxes in out: $(pretty_round(volume_boxes(out, scale)))")
-        println(io, "Volume of boxes in delta: $(pretty_round(volume_boxes(delta, scale)))")
+        write_time(io, time)
+    end
+    println("The time was saved in $(filepath).")
+end
+
+function save_log(time, inn, out, delta, scale, filename)
+    filepath = _save_log_setup(filename)
+    open(filepath, "w") do io
+        write_time(io, time)
+        write_volumes(io, inn, out, delta, scale)
+    end
+    println("Paving information was saved in $(filepath).")
+end
+
+function save_log(time, X_0, delta, filename)
+    filepath = _save_log_setup(filename)
+    open(filepath, "w") do io
+        write_time(io, time)
+        write_ratio(io, X_0, delta)
     end
     println("Paving information was saved in $(filepath).")
 end
