@@ -4,7 +4,8 @@ using BenchmarkTools
 
 # Load the neural network
 
-nnet = read_onnx_mlp("models/normed_etcs_2x250_nodes.onnx")
+modelpath = joinpath(@__DIR__, "models/normed_etcs_2x250_nodes.onnx")
+nnet = read_onnx_mlp(modelpath)
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_jacobian(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -21,7 +22,7 @@ confidence(mat::Matrix) = mat[2, :] - mat[1, :]
 
 p = 3
 f_fun = Function[(x...) -> confidence(N([x[1], x[2], x[3]]))]
-{{jacobian}}
+Df_fun = ColJacobianMatrix(collect((x...) -> [confidence(dN(i, x[1:p]))] for i in 1:p))
 sizes = [1]
 formula = parseformula("P_1")
 qvs = [(Forall, 2), (Forall, 3)]
@@ -45,14 +46,14 @@ timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milli
 
 # Save the paving in .png file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(δ)_$(ϵ_x)"
 
 xticks = (25, 149)
 outfile = base * ".png"
-save_drawing(X_0, inn, out, delta, outfile, xticks)
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile, xticks)
 
 # Save the timing in a log file
 
 logfile = base * ".log"
-save_log(timing, logfile)
+save_log(timing, @__DIR__, logfile)

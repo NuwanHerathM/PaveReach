@@ -4,7 +4,8 @@ using BenchmarkTools
 
 # Load the neural network
 
-nnet = read_nnet("models/running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
+modelpath = joinpath(@__DIR__, "models/running_example.nnet")
+nnet = read_nnet(modelpath; last_layer_activation = NeuralVerification.ReLU())
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_jacobian(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -35,7 +36,11 @@ f_fun = Function[(x...) -> confidence_1(N(x[1:2])),
         (x...) -> confidence_1(N(perturbation(x[1:4]))),
         (x...) -> confidence_2(N(x[1:2])),
         (x...) -> confidence_2(N(perturbation(x[1:4])))]
-{{jacobian}}
+df_1(x...) = [confidence_1(dN(1, x[1:2])), confidence_1(dN(1, perturbation(x[1:4]))), confidence_2(dN(1, x[1:2])), confidence_2(dN(1, perturbation(x[1:4])))];
+df_2(x...) = [confidence_1(dN(2, x[1:2])), confidence_1(dN(2, perturbation(x[1:4]))), confidence_2(dN(2, x[1:2])), confidence_2(dN(2, perturbation(x[1:4])))];
+df_3(x...) = [0, confidence_1(dN(1, perturbation(x[1:4]))), 0, confidence_2(dN(1, perturbation(x[1:4])))];
+df_4(x...) = [0, confidence_1(dN(2, perturbation(x[1:4]))), 0, confidence_2(dN(2, perturbation(x[1:4])))];
+Df_fun = ColJacobianMatrix([df_1, df_2, df_3, df_4])
 sizes = [1, 1, 1, 1]
 formula = parseformula("((¬ P_1) ∨ P_2) ∧ ((¬ P_3) ∨ P_4)")
 qvs = [(Forall, 3), (Forall, 4)]
@@ -60,13 +65,13 @@ timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milli
 
 # Save the paving in .png file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(δ)_$(ϵ_x)"
 
 outfile = base * ".png"
-save_drawing(X_0, inn, out, delta, outfile)
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile)
 
 # Save the timing in a log file
 
 logfile = base * ".log"
-save_log(timing, logfile)
+save_log(timing, @__DIR__, logfile)

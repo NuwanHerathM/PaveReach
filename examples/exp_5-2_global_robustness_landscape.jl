@@ -23,7 +23,8 @@ parsed_args = parse_commandline()
 
 # Load the neural network
 
-nnet = read_onnx_mlp("models/normed_etcs_2x250_nodes.onnx")
+modelpath = joinpath(@__DIR__, "models/normed_etcs_2x250_nodes.onnx")
+nnet = read_onnx_mlp(modelpath)
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_jacobian(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -42,7 +43,7 @@ confidence(mat::Matrix) = mat[1, :] - mat[2, :]
 gradient_variables = [1; 0; 0]
 
 function perturbation(x)
-    return [x[1] + x[2], x_h, x_r]
+    return [x[1] + x[2], interval(x_h), interval(x_r)]
 end
 
 function gradient_perturbation(x)
@@ -54,11 +55,9 @@ end
 # Set the problem
 
 p = 2
-f_fun = Function[(x...) -> confidence(N([x[1], x_h, x_r])),
+f_fun = Function[(x...) -> confidence(N([x[1], interval(x_h), interval(x_r)])),
         (x...) -> confidence(N(perturbation(x[1:2])))]
-# Df_fun = RowJacobianMatrix([(x...) -> [confidence(DN(IntervalBox([x[1], x_h, x_r])) * gradient_variables)..., 0],
-#             (x...) -> [confidence(DN(IntervalBox(perturbation(x[1:2]))) * gradient_perturbation(x[1:2]))...]])
-Df_fun = ColJacobianMatrix([(x...) -> [confidence(dN(1, [x[1], x_h, x_r])), confidence(dN(1, perturbation(x[1:2])))],
+Df_fun = ColJacobianMatrix([(x...) -> [confidence(dN(1, [x[1], interval(x_h), interval(x_r)])), confidence(dN(1, perturbation(x[1:2])))],
             (x...) -> [0, confidence(dN(1, perturbation(x[1:2])))]])
 sizes = [1, 1]
 formula = parseformula("(¬ P_1) ∨ P_2")
@@ -77,21 +76,20 @@ configuration = PavingConfiguration(ϵ_x)
 # Pave
 
 verbose = false
-# @btime(global inn, out, delta = pave_12(X_0, p_in, p_out, G, qcp, ϵ_x, ϵ_p, allow_exists_and_forall_bisection, allow_exists_or_forall_bisection))
 benchmark = @benchmarkable (global inn, out, delta = pave_12(X_0, parameters, domains, configuration, verbose)) samples=1 evals=1
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
 # Save the paving in .png file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(δ)_$(ϵ_x)"
 
 xticks = (25, 149)
 outfile = base * ".png"
-save_drawing(X_0, inn, out, delta, outfile, xticks)
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile, xticks)
 
 # Save the timing in a log file
 
 logfile = base * ".log"
-save_log(timing, logfile)
+save_log(timing, @__DIR__, logfile)

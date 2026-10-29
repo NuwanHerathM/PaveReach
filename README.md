@@ -11,15 +11,38 @@ Paving of a set describing a quantified constraint problem, using general reacha
 ```julia
 include("PaveReach.jl")
 ...
-inn, out, delta = pave_11(...)
+inn, out, delta = pave(...)
 ```
 
-For a quantified set $\Sigma$, the paving function `pave_11` returns
+For a quantified set $\Sigma$, the paving function `pave` returns
 - the inside $\Sigma^-$ in  `inn`,
 - the outside $(\Sigma^\complement)^-$ in `out`,
 - and the potential boundary $\Sigma^\Delta$ in `delta`.
 
 For the different paving functions, see [Oracles](#oracles).
+
+## Producing experimental results with a Docker image
+
+We provide scripts to run experiments present in `examples/`.
+
+### Requirement
+
+Make sure that you have
+[Docker](https://docs.docker.com/get-started/) installed and running.
+
+### Building the Docker image
+
+Get in the root directory, where you can find the `Dockerfile` and `Makefile` files. Run the `make` command in order to build the image that will be named `pavereach`, to decompress the models present in `examples/models/` and to change the mode of the scripts to execute.
+```
+make
+```
+
+### Running experiments
+
+Scripts are provided in `.sh` files. Simply run
+```
+./<filename>.sh
+```
 
 ## Using the prototype
 ### Dependencies

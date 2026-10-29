@@ -7,7 +7,8 @@ using BenchmarkTools
 # ACAS Xu model from the Reluplex paper
 # It is from 2017
 # https://github.com/guykatzz/ReluplexCav2017/tree/master/nnet
-nnet = read_nnet("models/ACASXU_run2a_1_1_batch_2000.nnet")
+modelpath = joinpath(@__DIR__, "models/ACASXU_run2a_1_1_batch_2000.nnet")
+nnet = read_nnet(modelpath)
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -57,30 +58,26 @@ function normalize_output(value)
     return (value - output_mean) / output_range
 end
 
-# Set the problem
-# ρ ∈ [0, 60760] ∣ ¬ N_1(ρ, 0, 0, 1000, 600) ≤ 22
+# ϕ_1 coc < 1500
 
-p = 1
-θ = 0.0
-ψ = 0.0
-v_o = 1000.0
-v_i = 600.0
-x_constant = [normalize_input(2, interval(θ)), normalize_input(3, interval(ψ)), normalize_input(4, interval(v_o)), normalize_input(5, interval(v_i))]
-f_fun = Function[(x...) -> N([x[1], x_constant...])[1]]
-Df_fun = ColJacobianMatrix([(x...) -> [dN(1, [x[1], x_constant...])[1]]])
+# Pave ρ and θ
+p = 2
+x_constant = [normalize_input(3, interval(0.0)), normalize_input(4, interval(1200.0)), normalize_input(5, interval(60.0))]
+f_fun = Function[(x...) -> N([x[1], x[2], x_constant...])[1]]
+Df_fun = ColJacobianMatrix([(x...) -> [dN(1, [x[1], x[2], x_constant...])[1]],
+            (x...) -> [dN(2, [x[1], x[2], x_constant...])[1]]])
 sizes = [1]
-formula = parseformula("¬ P_1")
+formula = parseformula("P_1")
 qvs = QuantifiedVariable[]
 qvs_relaxed = [qvs]
 parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
-X = interval(0.0, 60760.0)
-X_0 = normalize_input(1, X)
+X = [interval(55947.0, 60760.0), interval(-π, π)]
+X_0 = [normalize_input(1, X[1]), normalize_input(2, X[2])]
 P = []
-δ = 22
-G = [interval(minus_inf, normalize_output(δ))]
+G = [interval(minus_inf, normalize_output(1500.0) - strict_epsilon)]
 domains = ProblemDomains(P, G)
+ϵ_x = [0.01, 0.005]
 
-ϵ_x = [0.0001]
 configuration = PavingConfiguration(ϵ_x)
 
 # Pave
@@ -90,16 +87,10 @@ benchmark = @benchmarkable (global inn, out, delta = pave(X_0, parameters, domai
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
-# Save the paving in .png file
+# Save paving information in a .log file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(ϵ_x)"
-
-xticks = (0, 60760)
-outfile = base * ".png"
-save_drawing(X_0, inn, out, delta, outfile, xticks)
-
-# Save the timing in a log file
-
 logfile = base * ".log"
-save_log(timing, logfile)
+
+save_log(timing, inn, out, delta, ranges[1:2], @__DIR__, logfile)

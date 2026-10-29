@@ -2,31 +2,13 @@ include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
-# ------------------------------------------------------
-using ArgParse
-
-function parse_commandline()
-    s = ArgParseSettings()
-
-    @add_arg_table s begin
-        "eps"
-            help = "precision epsilon of the paving"
-            arg_type = Float64
-            required = true
-    end
-
-    return parse_args(s)
-end
-
-parsed_args = parse_commandline()
-# ------------------------------------------------------
-
 # Load the neural network
 
 # ACAS Xu model from the Reluplex paper
 # It is from 2017
 # https://github.com/guykatzz/ReluplexCav2017/tree/master/nnet
-nnet = read_nnet("models/ACASXU_run2a_1_1_batch_2000.nnet")
+modelpath = joinpath(@__DIR__, "models/ACASXU_run2a_1_1_batch_2000.nnet")
+nnet = read_nnet(modelpath)
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -76,15 +58,11 @@ function normalize_output(value)
     return (value - output_mean) / output_range
 end
 
-# Set the problem
-# ρ ∈ [0, 10000] ∣ N_1(ρ, 0, 0, 1000, 600) ≤ 22
+# ϕ_1 coc < 1500
 
+# Pave ρ
 p = 1
-θ = 0.0
-ψ = 0.0
-v_o = 1000.0
-v_i = 600.0
-x_constant = [normalize_input(2, interval(θ)), normalize_input(3, interval(ψ)), normalize_input(4, interval(v_o)), normalize_input(5, interval(v_i))]
+x_constant = [normalize_input(2, interval(0.0)), normalize_input(3, interval(0.0)), normalize_input(4, interval(1200.0)), normalize_input(5, interval(60.0))]
 f_fun = Function[(x...) -> N([x[1], x_constant...])[1]]
 Df_fun = ColJacobianMatrix([(x...) -> [dN(1, [x[1], x_constant...])[1]]])
 sizes = [1]
@@ -92,14 +70,13 @@ formula = parseformula("P_1")
 qvs = QuantifiedVariable[]
 qvs_relaxed = [qvs]
 parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
-X = interval(0.0, 10000.0)
+X = interval(55947.0, 60760.0)
 X_0 = normalize_input(1, X)
 P = []
-δ = 22
-G = [interval(minus_inf, normalize_output(δ))]
+G = [interval(minus_inf, normalize_output(1500.0) - strict_epsilon)]
 domains = ProblemDomains(P, G)
 
-ϵ_x = [parsed_args["eps"]]
+ϵ_x = [0.01]
 configuration = PavingConfiguration(ϵ_x)
 
 # Pave
@@ -109,19 +86,10 @@ benchmark = @benchmarkable (global inn, out, delta = pave(X_0, parameters, domai
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
-println("Undecided percentage")
-println("Δ / X_0: ", round(volume_boxes(delta) / volume_box(X_0) * 100; digits=2), "%")
+# Save paving information in a .log file
 
-# Save the paving in .png file
-
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(ϵ_x)"
-
-xticks = (0, 10000)
-outfile = base * ".png"
-save_drawing(X_0, inn, out, delta, outfile, xticks)
-
-# Save the timing in a log file
-
 logfile = base * ".log"
-save_log(timing, logfile)
+
+save_log(timing, inn, out, delta, ranges[1], @__DIR__, logfile)

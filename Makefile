@@ -1,13 +1,21 @@
-all: build_docker chmod
+all: build_docker decompress chmod
 
 build_docker:
-	docker build -t globalqe .
+	docker build -t pavereach .
+
+decompress:
+	if [ ! -f examples/models/normed_etcs_2x250_nodes.onnx ]; then \
+		gzip -d examples/models/normed_etcs_2x250_nodes.onnx.gz; \
+	fi
+	if [ ! -f examples/models/ACASXU_run2a_1_1_batch_2000.nnet ]; then \
+		gzip -d examples/models/ACASXU_run2a_1_1_batch_2000.nnet.gz; \
+	fi
 
 chmod:
-	chmod +x Fig*.sh Tab*.sh
+	chmod +x Figure*.sh Table1.sh
 
-run_Fig5:
-	docker run -v .:/app globalqe examples/ex_5-2_stability_controller.jl 0.1 --with_luxor
+run_Figure5a:
+	docker run -v .:/app pavereach examples/exp_5-1_global_robustness_landscape_class_1.jl
 
 clean:
-	rm -f *.png *.log
+	rm -r examples/outputs

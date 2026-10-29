@@ -2,12 +2,10 @@ include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
-input_x = 0.5
-input_y = -0.35
+# Load the neural network
 
-filename = splitext(PROGRAM_FILE)[1]
-
-nnet = read_nnet("models/running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
+modelpath = joinpath(@__DIR__, "models/running_example.nnet")
+nnet = read_nnet(modelpath; last_layer_activation = NeuralVerification.ReLU())
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_jacobian(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -15,9 +13,13 @@ N(x::Tuple) = N(collect(x))
 DN(x::Tuple) = DN(collect(x))
 dN(i, x::Tuple) = dN(i, collect(x))
 
+# Define the confidence function
+
 confidence(vect::AbstractVector) = vect[1] - vect[2]
 confidence(mat::Matrix) = mat[1, :] - mat[2, :]
 
+input_x = 0.5
+input_y = -0.35
 input = [input_x, input_y]
 
 function perturbation(x)
@@ -28,6 +30,9 @@ function gradient_perturbation(x)
     return [x[2] x[1] 0;
             x[3] 0 x[1]]
 end
+
+# Set the problem
+# λ ∣ ∀ ϵ ∈ [-0.5, 0.5]², confidence(N(0.5 + ϵ_1, -0.35 + ϵ_2)) > 0
 
 p = 3
 f_fun = Function[(x...) -> confidence(N(perturbation(x[1:3])))]
@@ -60,12 +65,13 @@ timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milli
 
 # Save the paving in a .png file
 
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(input_x)_$(input_y)_$(ϵ_x)_$(ϵ_p)_refined"
 
 outfile = base * ".png"
-save_drawing(X_0, inn, out, delta, outfile)
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile)
 
 # Save the timing in a log file
 
 logfile = base * ".log"
-save_log(timing, logfile)
+save_log(timing, @__DIR__, logfile)

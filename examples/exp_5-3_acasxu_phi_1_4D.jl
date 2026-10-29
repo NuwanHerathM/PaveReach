@@ -7,7 +7,8 @@ using BenchmarkTools
 # ACAS Xu model from the Reluplex paper
 # It is from 2017
 # https://github.com/guykatzz/ReluplexCav2017/tree/master/nnet
-nnet = read_nnet("models/ACASXU_run2a_1_1_batch_2000.nnet")
+modelpath = joinpath(@__DIR__, "models/ACASXU_run2a_1_1_batch_2000.nnet")
+nnet = read_nnet(modelpath)
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -59,24 +60,26 @@ end
 
 # ϕ_1 coc < 1500
 
-# Pave ρ and θ
-p = 2
-x_constant = [normalize_input(3, interval(0.0)), normalize_input(4, interval(1200.0)), normalize_input(5, interval(60.0))]
-f_fun = Function[(x...) -> N([x[1], x[2], x_constant...])[1]]
-Df_fun = ColJacobianMatrix([(x...) -> [dN(1, [x[1], x[2], x_constant...])[1]],
-            (x...) -> [dN(2, [x[1], x[2], x_constant...])[1]]])
+# Pave ρ, θ, v_o and v_i
+p = 4
+x_constant = [normalize_input(3, interval(0.0))]
+f_fun = Function[(x...) -> N([x[1], x[2], x_constant..., x[3], x[4]])[1]]
+Df_fun = ColJacobianMatrix([(x...) -> [dN(1, [x[1], x[2], x_constant..., x[3], x[4]])[1]],
+            (x...) -> [dN(2, [x[1], x[2], x_constant..., x[3], x[4]])[1]],
+            (x...) -> [dN(4, [x[1], x[2], x_constant..., x[3], x[4]])[1]],
+            (x...) -> [dN(5, [x[1], x[2], x_constant..., x[3], x[4]])[1]]])
 sizes = [1]
 formula = parseformula("P_1")
 qvs = QuantifiedVariable[]
 qvs_relaxed = [qvs]
 parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
-X = [interval(55947.0, 60760.0), interval(-π, π)]
-X_0 = [normalize_input(1, X[1]), normalize_input(2, X[2])]
+X = [interval(55947.0, 60760.0), interval(-π, π), interval(1145.0, 1200.0), interval(0.0, 60.0)]
+X_0 = [normalize_input(1, X[1]), normalize_input(2, X[2]), normalize_input(4, X[3]), normalize_input(5, X[4])]
 P = []
 G = [interval(minus_inf, normalize_output(1500.0) - strict_epsilon)]
 domains = ProblemDomains(P, G)
-ϵ_x = [0.01, 0.005]
 
+ϵ_x = [0.01, 0.005, 0.01, 0.01]
 configuration = PavingConfiguration(ϵ_x)
 
 # Pave
@@ -88,8 +91,8 @@ timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milli
 
 # Save paving information in a .log file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(ϵ_x)"
 logfile = base * ".log"
 
-save_log(timing, inn, out, delta, logfile)
+save_log(timing, inn, out, delta, map(i -> ranges[i], [1, 2, 4, 5]), @__DIR__, logfile)

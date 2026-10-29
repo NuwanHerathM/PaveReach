@@ -7,7 +7,8 @@ using BenchmarkTools
 # ACAS Xu model from the Reluplex paper
 # It is from 2017
 # https://github.com/guykatzz/ReluplexCav2017/tree/master/nnet
-nnet = read_nnet("models/ACASXU_run2a_1_1_batch_2000.nnet")
+modelpath = joinpath(@__DIR__, "models/ACASXU_run2a_1_1_batch_2000.nnet")
+nnet = read_nnet(modelpath)
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -57,11 +58,15 @@ function normalize_output(value)
     return (value - output_mean) / output_range
 end
 
-# ϕ_1 coc < 1500
+# Set the problem
+# ρ ∈ [0, 10000] ∣ N_1(ρ, 0, 0, 1000, 600) ≤ 22
 
-# Pave ρ
 p = 1
-x_constant = [normalize_input(2, interval(0.0)), normalize_input(3, interval(0.0)), normalize_input(4, interval(1200.0)), normalize_input(5, interval(60.0))]
+θ = 0.0
+ψ = 0.0
+v_o = 1000.0
+v_i = 600.0
+x_constant = [normalize_input(2, interval(θ)), normalize_input(3, interval(ψ)), normalize_input(4, interval(v_o)), normalize_input(5, interval(v_i))]
 f_fun = Function[(x...) -> N([x[1], x_constant...])[1]]
 Df_fun = ColJacobianMatrix([(x...) -> [dN(1, [x[1], x_constant...])[1]]])
 sizes = [1]
@@ -69,13 +74,14 @@ formula = parseformula("P_1")
 qvs = QuantifiedVariable[]
 qvs_relaxed = [qvs]
 parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
-X = interval(55947.0, 60760.0)
+X = interval(0.0, 10000.0)
 X_0 = normalize_input(1, X)
 P = []
-G = [interval(minus_inf, normalize_output(1500.0) - strict_epsilon)]
+δ = 22
+G = [interval(minus_inf, normalize_output(δ))]
 domains = ProblemDomains(P, G)
 
-ϵ_x = [0.05]
+ϵ_x = [0.0001]
 configuration = PavingConfiguration(ϵ_x)
 
 # Pave
@@ -85,10 +91,16 @@ benchmark = @benchmarkable (global inn, out, delta = pave(X_0, parameters, domai
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
-# Save paving information in a .log file
+# Save the paving in .png file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(ϵ_x)"
-logfile = base * ".log"
 
-save_log(timing, inn, out, delta, logfile)
+xticks = (0, 10000)
+outfile = base * ".png"
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile, xticks)
+
+# Save the timing in a log file
+
+logfile = base * ".log"
+save_log(timing, @__DIR__, logfile)

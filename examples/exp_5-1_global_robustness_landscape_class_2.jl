@@ -2,28 +2,10 @@ include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
-# ------------------------------------------------------
-using ArgParse
-
-function parse_commandline()
-    s = ArgParseSettings()
-
-    @add_arg_table s begin
-        "delta"
-            help = "confidence delta"
-            arg_type = Float64
-            required = true
-    end
-
-    return parse_args(s)
-end
-
-parsed_args = parse_commandline()
-# ------------------------------------------------------
-
 # Load the neural network
 
-nnet = read_nnet("models/running_example.nnet"; last_layer_activation = NeuralVerification.ReLU())
+modelpath = joinpath(@__DIR__, "models/running_example.nnet")
+nnet = read_nnet(modelpath; last_layer_activation = NeuralVerification.ReLU())
 N(x) = NeuralVerification.compute_output(nnet, x)
 DN(x) = get_gradient(nnet, x)
 dN(i, x) = get_partial_derivative(nnet, i, x)
@@ -34,8 +16,8 @@ dN(i, x::Tuple) = dN(i, collect(x))
 
 # Define the confidence function
 
-confidence(vect::AbstractVector) = vect[1] - vect[2]
-confidence(mat::Matrix) = mat[1, :] - mat[2, :]
+confidence(vect::AbstractVector) = vect[2] - vect[1]
+confidence(mat::Matrix) = mat[2, :] - mat[1, :]
 
 function perturbation(x)
     return [x[1] + x[3], x[2] + x[4]]
@@ -64,7 +46,7 @@ parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, 
 X_0 = IntervalBox(interval(-1, 1), interval(-1, 1))
 ϵ_max = 1/8
 P = [interval(-ϵ_max, ϵ_max), interval(-ϵ_max, ϵ_max)]
-δ = parsed_args["delta"]
+δ = 1/8
 G = [interval(δ + strict_epsilon, plus_inf), interval(strict_epsilon, plus_inf)]
 domains = ProblemDomains(P, G)
 
@@ -80,13 +62,13 @@ timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milli
 
 # Save the paving in .png file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(δ)_$(ϵ_x)"
     
 outfile = base * ".png"
-save_drawing(X_0, inn, out, delta, outfile)
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile)
 
 # Save the timing in a log file
 
 logfile = base * ".log"
-save_log(timing, logfile)
+save_log(timing, @__DIR__, logfile)
