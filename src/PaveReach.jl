@@ -3,10 +3,8 @@ using LazySets
 using LinearAlgebra
 using Luxor
 using Match
-using MathTeXEngine
 using NeuralVerification
 using ONNX
-using Plots
 using ReusePatterns
 using SoleLogics
 using StaticArrays

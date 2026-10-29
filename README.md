@@ -48,6 +48,9 @@ For `PaveReach`
 * `StaticArrays` v1.9.16
 * `SoleLogics` v0.13.7
 
+For `ONNX` v0.3.0
+* `ProtoBuf` v1.2.3 (later versions produce a warning)
+
 #### Adding a package
 
 Call `julia` to get in the interactive REPL.
@@ -66,7 +69,7 @@ pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 Or add all the packages at once.
 ```julia
-pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7 ONNX @0.3.0 SoleLogics @0.13.7 ReusePatterns @0.3.1 Pandas @1.6.1
+pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Polyhedra @0.8.1 StaticArrays @1.9.16 Symbolics @6.31.0 CDDLib @0.10.2 Match @2.4.1 Plots @1.41.5 ArgParse @1.2.0 LaTeXStrings @1.4.0 BenchmarkTools @1.6.3 Luxor @4.3.0 MathTeXEngine @0.6.7 ProtoBuf @1.2.3 ONNX @0.3.0 SoleLogics @0.13.7 ReusePatterns @0.3.1 Pandas @1.6.1
 pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.

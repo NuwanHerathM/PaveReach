@@ -165,6 +165,17 @@ function print_delta_width(delta)
     Base.println("Width of delta regions: ", IntervalArithmetic.diam.(merge_intervals([box[1] for box in delta])))
 end
 
+# Save setup
+
+function _save_setup(dirpath, filename)
+    outdirpath = joinpath(dirpath, "outputs/")
+    if !isdir(outdirpath)
+        mkdir(outdirpath)
+        println("Created $(outdirpath).")
+    end
+    return joinpath(outdirpath, filename)
+end
+
 # Luxor drawing
 
 function luxor_box2pq(box)
@@ -260,13 +271,8 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks=nothing,
     end
 end
 
-function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, filename, xticks=nothing, yticks=nothing) where N
-    outdir = "outputs/"
-    if !isdir(outdir)
-        mkdir(outdir)
-        println("Created $(outdir).")
-    end
-    filepath = outdir * filename
+function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, dirpath, filename, xticks=nothing, yticks=nothing) where N
+    filepath = _save_setup(dirpath, filename)
     width = 1000
     height = @match N begin
         1 => 50
@@ -277,24 +283,17 @@ function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, filename, xt
     Drawing(width + 2*buffer, height + 2*buffer, filepath)
     luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks, yticks)
     finish()
-    println("The result was saved in $(filepath).")
+    println("The result was saved in $(relpath(filepath, pwd())).")
 end
 
-save_drawing(X_0::AbstractVector{IntervalArithmetic.Interval{T}}, inn, out, delta, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename, xticks, yticks)
-save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, filename, xticks, yticks)
+save_drawing(X_0::AbstractVector{IntervalArithmetic.Interval{T}}, inn, out, delta, dirpath, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, dirpath, filename, xticks, yticks)
+save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, dirpath, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, dirpath, filename, xticks, yticks)
 
 # Logging
 
-function create_outdir(outdir)
-    if !isdir(outdir)
-        mkdir(outdir)
-        println("Created $(outdir).")
-    end
-end
-
-function write_time(io, time)
+function write_timing(io, timing)
     println(io, "Time (ms):")
-    println(io, time)
+    println(io, timing)
 end
 
 pretty_round(value) = value < 1e6 ? round(value, digits=3) : round(value, sigdigits=3)
@@ -310,34 +309,31 @@ function write_ratio(io, X_0, delta)
     println(io, "Δ / X_0: ", round(volume_boxes(delta) / volume_box(X_0) * 100; digits=2), "%")
 end
 
-function _save_log_setup(filename)
-    outdir = "outputs/"
-    create_outdir(outdir)
-    return outdir * filename
-end
-
-function save_log(time, filename)
-    filepath = _save_log_setup(filename)
+"""
+    Save log information to a file with the specified file name in a subdirectory of the specified directory path.
+"""
+function save_log(timing, dirpath, filename)
+    filepath = _save_setup(dirpath, filename)
     open(filepath, "w") do io
-        write_time(io, time)
+        write_timing(io, timing)
     end
-    println("The time was saved in $(filepath).")
+    println("The timing was saved in $(relpath(filepath, pwd())).")
 end
 
-function save_log(time, inn, out, delta, scale, filename)
-    filepath = _save_log_setup(filename)
+function save_log(timing, inn, out, delta, scale, dirpath, filename)
+    filepath = _save_setup(dirpath, filename)
     open(filepath, "w") do io
-        write_time(io, time)
+        write_timing(io, timing)
         write_volumes(io, inn, out, delta, scale)
     end
-    println("Paving information was saved in $(filepath).")
+    println("Paving information was saved in $(relpath(filepath, pwd())).")
 end
 
-function save_log(time, X_0, delta, filename)
-    filepath = _save_log_setup(filename)
+function save_log(timing, X_0, delta, dirpath, filename)
+    filepath = _save_setup(dirpath, filename)
     open(filepath, "w") do io
-        write_time(io, time)
+        write_timing(io, timing)
         write_ratio(io, X_0, delta)
     end
-    println("Paving information was saved in $(filepath).")
+    println("Paving information was saved in $(relpath(filepath, pwd())).")
 end
