@@ -32,7 +32,7 @@ Make sure that you have
 
 ### Building the Docker image
 
-Get in the root directory, where you can find the `Dockerfile` and `Makefile` files. Run the `make` command in order to build the image that will be named `pavereach`, to decompress the models present in `examples/models/` and to change the mode of the scripts to execute.
+Get in the root directory, where you can find the `Dockerfile` and `Makefile` files. Run the `make` command in order to decompress the models present in `examples/models/`, to build the image that will be named `pavereach` and to change the mode of the scripts to execute.
 ```
 make
 ```

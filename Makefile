@@ -1,7 +1,4 @@
-all: build_docker decompress chmod
-
-build_docker:
-	docker build -t pavereach .
+all: decompress build_docker chmod
 
 decompress:
 	if [ ! -f examples/models/normed_etcs_2x250_nodes.onnx ]; then \
@@ -10,6 +7,9 @@ decompress:
 	if [ ! -f examples/models/ACASXU_run2a_1_1_batch_2000.nnet ]; then \
 		gzip -d examples/models/ACASXU_run2a_1_1_batch_2000.nnet.gz; \
 	fi
+
+build_docker:
+	docker build -t pavereach .
 
 chmod:
 	chmod +x Figure*.sh Table1.sh
