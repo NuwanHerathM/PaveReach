@@ -539,7 +539,7 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
         for i in 1:(n_in)
             f_num_in[i] -= z_in[i]
         end
-        f_fun_in, Df_fun_in = build_function_f_Df_2(f_num_in, [variables; z_in], n_in, p + n_in)
+        f_fun_in, Df_fun_in = build_function_f_Df(f_num_in, [variables; z_in], n_in, p + n_in)
         Df_fun_in = MatJacobianMatrix(Df_fun_in)
     elseif userfunctions isa UserDefinedFunctions
         f_inflated = inflate(get_f(userfunctions), positions_in)
@@ -589,7 +589,7 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
         for i in 1:(n_out)
             f_num_out[i] -= z_out[i]
         end
-        f_fun_out, Df_fun_out = build_function_f_Df_2(f_num_out, [variables; z_out], n_out, p + n_out)
+        f_fun_out, Df_fun_out = build_function_f_Df(f_num_out, [variables; z_out], n_out, p + n_out)
         Df_fun_out = MatJacobianMatrix(Df_fun_out)
     elseif userfunctions isa UserDefinedFunctions
         f_inflated = inflate(get_f(userfunctions), positions_out)
@@ -649,7 +649,7 @@ is_refined(configuration::PavingConfiguration) = configuration.allow_exists_and_
 
 function Base.show(io::IO, configuration::PavingConfiguration)
     println(io, "ϵ_x: $(configuration.ϵ_x)")
-    if !isnothing(configuration.ϵ_p)
+    if !isempty(configuration.ϵ_p)
         println(io, "ϵ_p: $(configuration.ϵ_p)")
     end
     println(io, if configuration.allow_exists_and_forall_bisection "Refined" else "Not refined" end)

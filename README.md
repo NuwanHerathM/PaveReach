@@ -110,6 +110,10 @@ It should return:
 ϵ_x: [0.1, 0.1]
 Not refined
 No standard bisection on P
+Paving of the following domain
+[-5.0, 5.0]²
+Target domain
+[-100001.0, 4.0]⁴
 Paving completed.
 	Number of iterations: 995
 	Number of evaluations: 1867

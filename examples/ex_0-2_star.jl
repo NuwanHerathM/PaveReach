@@ -2,8 +2,6 @@ include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
-filename = splitext(PROGRAM_FILE)[1]
-
 # Set the problem
 
 p = 2
@@ -36,11 +34,12 @@ println(configuration)
 
 # Pave
 
-@btime (global inn, out, delta = pave(X_0, parameters, domains, configuration)) samples=1 evals=1
+inn, out, delta = pave(X_0, parameters, domains, configuration)
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 # Save the paving in .png file
 
+filename = splitext(basename(PROGRAM_FILE))[1]
 outfile = "$(filename)_$(ϵ_x).png"
 
-save_drawing(X_0, inn, out, delta, outfile)
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile)

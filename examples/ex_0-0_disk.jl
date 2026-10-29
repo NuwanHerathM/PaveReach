@@ -25,7 +25,7 @@ println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, dig
 
 # Save the paving in .png file
 
-filename = splitext(PROGRAM_FILE)[1]
+filename = splitext(basename(PROGRAM_FILE))[1]
 outfile = "$(filename)_11_$(ϵ_x).png"
 
-save_drawing(X_0, inn, out, delta, outfile)
+save_drawing(X_0, inn, out, delta, @__DIR__, outfile)

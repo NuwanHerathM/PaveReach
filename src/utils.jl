@@ -168,6 +168,12 @@ end
 # Save setup
 
 function _save_setup(dirpath, filename)
+    if !isdir(dirpath)
+        throw(ArgumentError("Invalid directory: \"$(dirpath)\""))
+    end
+    if ('/' in filename) || ('\\' in filename) || isempty(filename)
+        throw(ArgumentError("Invalid file name: \"$(filename)\""))
+    end
     outdirpath = joinpath(dirpath, "outputs/")
     if !isdir(outdirpath)
         mkdir(outdirpath)
