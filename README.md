@@ -63,7 +63,6 @@ For `PaveReach`
 * `Match` v2.4.1
 * `NeuralVerification` v0.1.0 (`https://github.com/sisl/NeuralVerification.jl`)
 * `ONNX` v0.3.0
-* `Plots` v1.41.5
 * `ReusePatterns` v0.3.1
 * `StaticArrays` v1.9.24
 * `SoleLogics` v0.13.7
@@ -89,7 +88,7 @@ pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 Or add all the packages at once.
 ```julia
-pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Symbolics @6.31.0 ArgParse @1.2.0 BenchmarkTools @1.8.0 Luxor @4.3.0 Match @2.4.1 ONNX @0.3.0 Plots @1.41.5 ReusePatterns @0.3.1 StaticArrays @1.9.24 SoleLogics @0.13.7 ProtoBuf @1.2.3
+pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Symbolics @6.31.0 ArgParse @1.2.0 BenchmarkTools @1.8.0 Luxor @4.3.0 Match @2.4.1 ONNX @0.3.0 ReusePatterns @0.3.1 StaticArrays @1.9.24 SoleLogics @0.13.7 ProtoBuf @1.2.3
 pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
@@ -469,48 +468,14 @@ pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters::ProblemParameters, dom
 
 ## Saving the output
 
-### New procedure
-
+For 1D and 2D outputs, save a drawing as `filename` at `dirpath`.
 ```julia
 outfile = ...
-save_drawing(X_0, inn, out, delta, outfile)
+save_drawing(X_0, inn, out, delta, dirpath, filename)
 ```
 
-### With Plots (deprecated)
-
+By default, x ticks and y ticks are deduced from `X_0`. If `X_0` is the result of a linear scaling, the initial ticks can be set.
 ```julia
-p = plot()
-draw(p, X_0, inn, out, delta)
-plot(p)
-outfile = ...
-savefig(outfile)
-println("The result was saved in $(outfile).")
-```
-
-It is also possible to display the result.
-
-```julia
-p = plot()
-draw(p, X_0, inn, out, delta)
-plot(p)
-gui()
-```
-
-Run the script in interactive mode in order to keep the REPL open to visualize the plot.
-
-```
-julia -i ...
-```
-
-### With Luxor (deprecated)
-
-```julia
-width = 600
-height = 40
-buffer = 50
-outfile = ...
-Drawing(width + 2*buffer, height + 2*buffer, outfile)
-luxor_draw(X_0, inn, out, delta, width, height, buffer)
-finish()
-println("The result was saved in $(outfile).")
+save_drawing(X_0, inn, out, delta, dirpath, filename, xticks=(x_start, x_end))
+save_drawing(X_0, inn, out, delta, dirpath, filename, xticks=(x_start, x_end), yticks=(y_start, y_end))
 ```

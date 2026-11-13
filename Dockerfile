@@ -24,7 +24,7 @@ COPY ./examples/models/normed_etcs_2x250_nodes.onnx ./examples/models/normed_etc
 COPY ./examples/models/ACASXU_run2a_1_1_batch_2000.nnet ./examples/models/ACASXU_run2a_1_1_batch_2000.nnet
 
 # Add Julia packages
-RUN julia -e 'using Pkg; Pkg.add(name="ArgParse", version="1.2.0"); Pkg.add(name="IntervalArithmetic", version="0.21.2"); Pkg.add(name="LazySets", version="2.14.2"); Pkg.add(name="Symbolics", version="6.31.0"); Pkg.add(name="ArgParse", version="1.2.0"); Pkg.add(name="BenchmarkTools", version="1.8.0"); Pkg.add(name="Luxor", version="4.3.0"); Pkg.add(name="Match", version="2.4.1"); Pkg.add(name="ONNX", version="0.3.0"); Pkg.add(name="Plots", version="1.41.5"); Pkg.add(name="ReusePatterns", version="0.3.1"); Pkg.add(name="StaticArrays", version="1.9.24"); Pkg.add(name="SoleLogics", version="0.13.7"); Pkg.add(name="ProtoBuf", version="1.2.3"); Pkg.add(url="https://github.com/sisl/NeuralVerification.jl", rev="master");'
+RUN julia -e 'using Pkg; Pkg.add(name="ArgParse", version="1.2.0"); Pkg.add(name="IntervalArithmetic", version="0.21.2"); Pkg.add(name="LazySets", version="2.14.2"); Pkg.add(name="Symbolics", version="6.31.0"); Pkg.add(name="ArgParse", version="1.2.0"); Pkg.add(name="BenchmarkTools", version="1.8.0"); Pkg.add(name="Luxor", version="4.3.0"); Pkg.add(name="Match", version="2.4.1"); Pkg.add(name="ONNX", version="0.3.0"); Pkg.add(name="ReusePatterns", version="0.3.1"); Pkg.add(name="StaticArrays", version="1.9.24"); Pkg.add(name="SoleLogics", version="0.13.7"); Pkg.add(name="ProtoBuf", version="1.2.3"); Pkg.add(url="https://github.com/sisl/NeuralVerification.jl", rev="master");'
 
 # Run the script with arguments
 ENTRYPOINT ["julia"]
