@@ -424,10 +424,6 @@ function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
     end
 end
 
-# function bounds(f, X, interval)
-#     return [f[i]([X.v..., interval...]) for i in 1:length(f)]
-# end
-
 function check_is_in(X_0, P_in::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: AbstractFloat
     @assert criterion == 1 || criterion == 2
 
@@ -530,7 +526,6 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
     M_in = expand(M, ranges_dict, G)
     n_in = length(atoms(M_in))
     positions_in = duplication_positions(M, ranges_dict, G)
-    # Δn_in = length(positions_in)
     if userfunctions isa UserDefinedSymbolicFunctions
         variables = get_variables(userfunctions)
         f_num = get_f_num(userfunctions)
@@ -545,7 +540,6 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
         f_inflated = inflate(get_f(userfunctions), positions_in)
         Df_inflated = inflate(get_Df(userfunctions), positions_in)
         f_fun_in = Function[]
-        # Df_fun_in = Matrix{Function}(undef, n_in, p + n_in)
         Dz = Matrix{Float64}(-LinearAlgebra.I, n_in, n_in)
         for i in 1:(n_in)
             f_fun_in_i = (x...) -> f_inflated[i](x[1:p]...) - x[p+i]
@@ -580,7 +574,6 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
     M_out = expand(M, ranges_dict, G)
     n_out = length(atoms(M_out))
     positions_out = duplication_positions(M, ranges_dict, G)
-    # Δn_out = length(positions_out)
     if userfunctions isa UserDefinedSymbolicFunctions
         variables = get_variables(userfunctions)
         f_num = get_f_num(userfunctions)
@@ -595,7 +588,6 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
         f_inflated = inflate(get_f(userfunctions), positions_out)
         Df_inflated = inflate(get_Df(userfunctions), positions_out)
         f_fun_out = Function[]
-        # Df_fun_out = Matrix{Function}(undef, n_out, p + n_out)
         Dz = Matrix{Float64}(-LinearAlgebra.I, n_out, n_out)
         for i in 1:(n_out)
             f_fun_out_i = (x...) -> f_inflated[i](x[1:p]...) - x[p+i]
@@ -673,7 +665,6 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     check_is_in = criterion_in == 1 ? check_is_in_1 : check_is_in_2
     check_is_out = criterion_out == 1 ? check_is_out_1 : check_is_out_2
     
-    # n = get_n(parameters)
     p = get_p(parameters)
     
     qcp_in = build_quantified_problem_in(parameters, domains, criterion_in)

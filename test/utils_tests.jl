@@ -10,10 +10,9 @@
             @test volume_box(segment, 2) == 13.0
             @test volume_box(segment, [2]) == 13.0
             @test_throws DimensionMismatch volume_box(segment, [2, 3])
-            @test_throws DimensionMismatch volume_box(box, 2)
-            @test_throws DimensionMismatch volume_box(box, [2])
             @test volume_box(box, 0.5, 1.5) == 4.5
             @test volume_box(box, [0.5, 1.5]) == 4.5
+            @test volume_box(box, 2) == 24.0
         end
     end
     @testset "List of boxes / intervals" begin
@@ -27,10 +26,9 @@
             @test volume_boxes(segments, 2) == 16.0
             @test volume_boxes(segments, [2]) == 16.0
             @test_throws DimensionMismatch volume_boxes(segments, [2, 3])
-            @test_throws DimensionMismatch volume_boxes(boxes, 2)
-            @test_throws DimensionMismatch volume_boxes(boxes, [2])
             @test volume_boxes(boxes, 0.5, 1.5) == 27.0
             @test volume_boxes(boxes, [0.5, 1.5]) == 27.0
+            @test volume_boxes(boxes, 2) == 144.0
         end
     end
 end

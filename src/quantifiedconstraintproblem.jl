@@ -1,4 +1,3 @@
-
 @enum Quantifier begin
     Forall
     Exists
@@ -66,7 +65,6 @@ struct ProblemParameters
     sizes::Vector{Int}
     qvs::Vector{QuantifiedVariable}
     qvs_relaxed::Vector{Vector{QuantifiedVariable}}
-    # n::Int
     p::Int
     function ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
         n = length(f_num)
@@ -78,8 +76,7 @@ struct ProblemParameters
         ProblemParameters(variables, f_num, convert(Vector{QuantifiedVariable}, qvs), convert(Vector{Vector{QuantifiedVariable}}, qvs_relaxed), p)
     end
     function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
-        # n = length(f_num)
-        # @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to number of functions."
+        @assert length(qvs_relaxed) == length(f_num) "Number of relaxed quantifier variable lists should be equal to number of functions."
         @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
         userfunctions = UserDefinedSymbolicFunctions(variables, f_num)
         new(M, userfunctions, sizes, qvs, qvs_relaxed, p)
@@ -88,9 +85,7 @@ struct ProblemParameters
         ProblemParameters(M, variables, f_num, sizes, convert(Vector{QuantifiedVariable}, qvs), convert(Vector{Vector{QuantifiedVariable}}, qvs_relaxed), p)
     end
     function ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
-        # n = length(f)
-        # @assert size(Df)[1] == n "Number of functions and gradients must be equal."
-        # @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to number of functions."
+        @assert length(qvs_relaxed) == length(f) "Number of relaxed quantifier variable lists should be equal to number of functions."
         @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
         userfunctions = UserDefinedFunctions(f, Df)
         new(M, userfunctions, sizes, qvs, qvs_relaxed, p)
@@ -102,7 +97,6 @@ get_f(parameters::ProblemParameters) = parameters.f
 get_qvs(parameters::ProblemParameters) = parameters.qvs
 get_qvs_relaxed(parameters::ProblemParameters) = parameters.qvs_relaxed
 get_sizes(parameters::ProblemParameters) = parameters.sizes
-# get_n(parameters::ProblemParameters) = parameters.n
 get_p(parameters::ProblemParameters) = parameters.p
 
 struct ProblemDomains{T}
@@ -124,9 +118,8 @@ struct ExpandedProblem{T}
     positions_dict::Dict{Atom{String}, Int}
     function ExpandedProblem(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, G::Vector{IntervalArithmetic.Interval{T}}, positions_dict::Dict{Atom{String}, Int}) where T <: Number
         @assert allunique(atoms(M)) "All predicates in the formula must be unique."
-        # @assert length(f) == size(Df)[1] "Number of functions and gradients must be equal."
-        # @assert length(f) == length(G) "Number of functions and domains must be equal."
-        # @assert length(f) == length(positions_dict) "Number of functions and positions must be equal."
+        @assert length(f) == length(G) "Number of functions and domains must be equal."
+        @assert length(f) == length(positions_dict) "Number of functions and positions must be equal."
         @assert length(positions_dict) == length(atoms(M)) "Number of positions and predicates must be equal."
         new{T}(M, f, Df, G, positions_dict)
     end
@@ -142,11 +135,8 @@ struct QuantifiedConstraintProblem
     problem::ExpandedProblem
     qvs::Vector{QuantifiedVariable}
     qvs_relaxed::Vector{Vector{QuantifiedVariable}}
-    # p::Int
-    # n::Int
     function QuantifiedConstraintProblem(problem::ExpandedProblem, qvs, qvs_relaxed)
-        # @assert length(problem.f) == n "Number of functions in the problem should be equal to n = $n."
-        # @assert length(qvs_relaxed) == n "Number of relaxed quantifier variable lists should be equal to n = $n."
+        @assert length(get_f(problem)) == length(qvs_relaxed) "Number of functions in the problem should be equal to the number of relaxed quantifier variable lists."
         new(problem, qvs, qvs_relaxed)
     end
 end
@@ -154,8 +144,6 @@ end
 @forward((QuantifiedConstraintProblem, :problem), ExpandedProblem)
 get_qvs(qcp::QuantifiedConstraintProblem) = qcp.qvs
 get_qvs_relaxed(qcp::QuantifiedConstraintProblem) = qcp.qvs_relaxed
-# get_n(qcp::QuantifiedConstraintProblem) = qcp.n
-# get_p(qcp::QuantifiedConstraintProblem) = qcp.p
 
 function quantifier(qcp::QuantifiedConstraintProblem, dim::Int)
     qvs = get_qvs(qcp)

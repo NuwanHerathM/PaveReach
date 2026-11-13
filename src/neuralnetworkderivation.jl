@@ -1,7 +1,27 @@
 """
     reluder(x)
+    reluder(x::IntervalArithmetic.Interval)
 
     Compute the derivative of the ReLu function.
+
+    # Examples
+    ```jldoctest
+    julia> reluder(2.0)
+    1
+
+    julia> reluder(-1.0)
+    0
+
+    julia> reluder(0.0)
+    ERROR: DomainError with 0.0:
+    The input to reluder must be non-zero.
+
+    julia> reluder(interval(-1.0, 2.0))
+    [0.0, 1.0]
+
+    julia> reluder(interval(0.0, 0.0))
+    [1.0, 1.0]
+    ```
 """
 function reluder(x)
     if x > 0
@@ -9,15 +29,10 @@ function reluder(x)
     elseif x < 0
         return 0
     else
-        throw(DomainError("The input to reluder must be non-zero."))
+        throw(DomainError(x, "The input to reluder must be non-zero."))
     end
 end
 
-"""
-    reluder(x::IntervalArithmetic.Interval)
-
-    For [0, 0], return [1, 1].
-"""
 function reluder(x::IntervalArithmetic.Interval{T}) where T <: Real
     if x.hi > 0
         upper = 1

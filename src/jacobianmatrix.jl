@@ -65,6 +65,9 @@ inflate(CJ::ColJacobianMatrix, indices) = ColJacobianMatrix(map(f -> ((x...) -> 
 
 # Append constant matrix
 
+"""
+    Append a constant matrix to a Jacobian matrix.
+"""
 function append_constant(MJ::MatJacobianMatrix{S1, S2}, Z::AbstractMatrix{T}) where {S1, S2, T <: Real}
     n, m = size(Z)
     @assert S1 == n == m "The first dimension of the Jacobian matrix $(S1) must match the size of the constant matrix ($(n), $(m))."
