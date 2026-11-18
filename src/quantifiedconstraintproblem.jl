@@ -41,7 +41,7 @@ end
 
 #----------------------------------------------------------------------------------------
 
-function build_ranges(sizes::Vector{Int})
+function _build_ranges(sizes::Vector{Int})
     end_indices::Vector{Int} = cumsum(sizes)
     start_indices::Vector{Int} = end_indices .- sizes .+ 1
     return range.(start_indices, end_indices)
@@ -49,7 +49,7 @@ end
 
 function build_ranges_dict(M::SyntaxTree, sizes::Vector{Int})
     keys = map(atom -> atom.value, atoms(M))
-    ranges = build_ranges(sizes)
+    ranges = _build_ranges(sizes)
     return Dict(zip(keys, ranges))
 end
 
@@ -64,39 +64,38 @@ struct ProblemParameters
     f::Union{UserDefinedFunctions, UserDefinedSymbolicFunctions}
     sizes::Vector{Int}
     qvs::Vector{QuantifiedVariable}
-    qvs_relaxed::Vector{Vector{QuantifiedVariable}}
     p::Int
-    function ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+    function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, p::Int)
+        @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
+        userfunctions = UserDefinedSymbolicFunctions(variables, f_num)
+        new(M, userfunctions, sizes, qvs, p)
+    end
+    function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{Any}, p::Int)
+        ProblemParameters(M, variables, f_num, sizes, convert(Vector{QuantifiedVariable}, qvs), p)
+    end
+    function ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, p::Int)
         n = length(f_num)
         M = parseformula("P")
         sizes = [n]
-        ProblemParameters(M, variables, f_num, sizes, qvs, qvs_relaxed, p)
+        ProblemParameters(M, variables, f_num, sizes, qvs, p)
     end
-    function ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{Any}, qvs_relaxed::Vector{Vector{Any}}, p::Int)
-        ProblemParameters(variables, f_num, convert(Vector{QuantifiedVariable}, qvs), convert(Vector{Vector{QuantifiedVariable}}, qvs_relaxed), p)
+    function ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{Any}, p::Int)
+        ProblemParameters(variables, f_num, convert(Vector{QuantifiedVariable}, qvs), p)
     end
-    function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
-        @assert length(qvs_relaxed) == length(f_num) "Number of relaxed quantifier variable lists should be equal to number of functions."
-        @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
-        userfunctions = UserDefinedSymbolicFunctions(variables, f_num)
-        new(M, userfunctions, sizes, qvs, qvs_relaxed, p)
-    end
-    function ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{Any}, qvs_relaxed::Vector{Vector{Any}}, p::Int)
-        ProblemParameters(M, variables, f_num, sizes, convert(Vector{QuantifiedVariable}, qvs), convert(Vector{Vector{QuantifiedVariable}}, qvs_relaxed), p)
-    end
-    function ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
-        @assert length(qvs_relaxed) == length(f) "Number of relaxed quantifier variable lists should be equal to number of functions."
+    function ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, p::Int)
         @assert length(sizes) == length(atoms(M)) "Number of dimensions should be equal to number of predicates."
         userfunctions = UserDefinedFunctions(f, Df)
-        new(M, userfunctions, sizes, qvs, qvs_relaxed, p)
+        new(M, userfunctions, sizes, qvs, p)
+    end
+    function ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes::Vector{Int}, qvs::Vector{Any}, p::Int)
+        ProblemParameters(M, f, Df, sizes, convert(Vector{QuantifiedVariable}, qvs), p)
     end
 end
 
 get_M(parameters::ProblemParameters) = parameters.M
 get_f(parameters::ProblemParameters) = parameters.f
-get_qvs(parameters::ProblemParameters) = parameters.qvs
-get_qvs_relaxed(parameters::ProblemParameters) = parameters.qvs_relaxed
 get_sizes(parameters::ProblemParameters) = parameters.sizes
+get_qvs(parameters::ProblemParameters) = parameters.qvs
 get_p(parameters::ProblemParameters) = parameters.p
 
 struct ProblemDomains{T}
@@ -131,25 +130,33 @@ get_Df(problem::ExpandedProblem) = problem.Df
 get_G(problem::ExpandedProblem) = problem.G
 get_positions_dict(problem::ExpandedProblem) = problem.positions_dict
 
-struct QuantifiedConstraintProblem
+struct UnderapproxQuantifiedConstraintProblem
     problem::ExpandedProblem
     qvs::Vector{QuantifiedVariable}
     qvs_relaxed::Vector{Vector{QuantifiedVariable}}
-    function QuantifiedConstraintProblem(problem::ExpandedProblem, qvs, qvs_relaxed)
+    function UnderapproxQuantifiedConstraintProblem(problem::ExpandedProblem, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}})
         @assert length(get_f(problem)) == length(qvs_relaxed) "Number of functions in the problem should be equal to the number of relaxed quantifier variable lists."
         new(problem, qvs, qvs_relaxed)
     end
-end
-
-@forward((QuantifiedConstraintProblem, :problem), ExpandedProblem)
-get_qvs(qcp::QuantifiedConstraintProblem) = qcp.qvs
-get_qvs_relaxed(qcp::QuantifiedConstraintProblem) = qcp.qvs_relaxed
-
-function quantifier(qcp::QuantifiedConstraintProblem, dim::Int)
-    qvs = get_qvs(qcp)
-    i = 1
-    while index(qvs) != dim
-        i += 1
+    function UnderapproxQuantifiedConstraintProblem(problem::ExpandedProblem, qvs::Vector{Any}, qvs_relaxed::Vector{Vector{Any}})
+        UnderapproxQuantifiedConstraintProblem(problem, convert(Vector{QuantifiedVariable}, qvs), convert(Vector{Vector{QuantifiedVariable}}, qvs_relaxed))
     end
-    return quantifier(qcp.qvs[i])
 end
+
+@forward((UnderapproxQuantifiedConstraintProblem, :problem), ExpandedProblem)
+get_qvs(qcp::UnderapproxQuantifiedConstraintProblem) = qcp.qvs
+get_qvs_relaxed(qcp::UnderapproxQuantifiedConstraintProblem) = qcp.qvs_relaxed
+
+struct OverapproxQuantifiedConstraintProblem
+    problem::ExpandedProblem
+    qvs::Vector{QuantifiedVariable}
+    function OverapproxQuantifiedConstraintProblem(problem::ExpandedProblem, qvs::Vector{QuantifiedVariable})
+        new(problem, qvs)
+    end
+    function OverapproxQuantifiedConstraintProblem(problem::ExpandedProblem, qvs::Vector{Any})
+        OverapproxQuantifiedConstraintProblem(problem, convert(Vector{QuantifiedVariable}, qvs))
+    end
+end
+
+@forward((OverapproxQuantifiedConstraintProblem, :problem), ExpandedProblem)
+get_qvs(qcp::OverapproxQuantifiedConstraintProblem) = qcp.qvs

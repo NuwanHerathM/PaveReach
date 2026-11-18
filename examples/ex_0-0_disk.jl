@@ -6,8 +6,7 @@ p = 2
 @variables x[1:p]
 f_num = [x[1]^2 + x[2]^2]
 qvs = []
-qvs_relaxed = [qvs]
-parameters = ProblemParameters(x, f_num, qvs, qvs_relaxed, p)
+parameters = ProblemParameters(x, f_num, qvs, p)
 X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))
 P = []
 G = [interval(0, 16)]
@@ -20,7 +19,8 @@ println(configuration)
 
 # Pave
 
-inn, out, delta = pave_11(X_0, parameters, domains, configuration)
+qvs_relaxed = [qvs]
+inn, out, delta = pave_11(X_0, parameters, qvs_relaxed, domains, configuration)
 println("Undecided domain: ", round(volume_boxes(delta)/volume_box(X_0)*100, digits=1), " %")
 
 # Save the paving in .png file

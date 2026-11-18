@@ -177,7 +177,7 @@ luxor_draw_inn_boxes(inn, X_0, width, height, buffer) = luxor_draw_boxes(inn, "g
 luxor_draw_out_boxes(out, X_0, width, height, buffer) = luxor_draw_boxes(out, "cyan", X_0, width, height, buffer)
 luxor_draw_delta_boxes(delta, X_0, width, height, buffer) = luxor_draw_boxes(delta, "yellow", X_0, width, height, buffer)
 
-function luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks=nothing, yticks=nothing)
+function luxor_draw(X_0, inn, out, delta, width, height, buffer; axis=true, xticks=nothing, yticks=nothing)
     if isa(X_0, IntervalArithmetic.Interval{<:Real}) || isa(X_0, IntervalBox{1, <:Real})
         background("white")
 
@@ -185,11 +185,13 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks=nothing,
         luxor_draw_out_rows(out, X_0, width, height, buffer)
         luxor_draw_delta_rows(delta, X_0, width, height, buffer)
 
-        sethue("black")
-        # xticks
-        x_start = isnothing(xticks) ? X_0[1].lo : xticks[1]
-        x_finish = isnothing(xticks) ? X_0[1].hi : xticks[2]
-        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= x_start, finishnumber=x_finish, major=4, minor=0)
+        if axis
+            sethue("black")
+            # xticks
+            x_start = isnothing(xticks) ? X_0[1].lo : xticks[1]
+            x_finish = isnothing(xticks) ? X_0[1].hi : xticks[2]
+            tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= x_start, finishnumber=x_finish, major=4, minor=0)
+        end
     elseif isa(X_0, IntervalBox{2, <:Real})
         background("white")
         
@@ -197,21 +199,23 @@ function luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks=nothing,
         luxor_draw_out_boxes(out, X_0, width, height, buffer)
         luxor_draw_delta_boxes(delta, X_0, width, height, buffer)
         
-        sethue("black")
-        # xticks
-        x_start = isnothing(xticks) ? X_0[1].lo : xticks[1]
-        x_finish = isnothing(xticks) ? X_0[1].hi : xticks[2]
-        tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= x_start, finishnumber=x_finish, major=4, minor=0)
-        # yticks
-        y_start = isnothing(yticks) ? X_0[2].lo : yticks[1]
-        y_finish = isnothing(yticks) ? X_0[2].hi : yticks[2]
-        tickline(Luxor.Point(buffer + width, buffer + height), Luxor.Point(buffer + width, buffer), startnumber= y_start, finishnumber=y_finish, major=4, minor=0)
+        if axis
+            sethue("black")
+            # xticks
+            x_start = isnothing(xticks) ? X_0[1].lo : xticks[1]
+            x_finish = isnothing(xticks) ? X_0[1].hi : xticks[2]
+            tickline(Luxor.Point(buffer, buffer + height), Luxor.Point(buffer + width, buffer + height), startnumber= x_start, finishnumber=x_finish, major=4, minor=0)
+            # yticks
+            y_start = isnothing(yticks) ? X_0[2].lo : yticks[1]
+            y_finish = isnothing(yticks) ? X_0[2].hi : yticks[2]
+            tickline(Luxor.Point(buffer + width, buffer + height), Luxor.Point(buffer + width, buffer), startnumber= y_start, finishnumber=y_finish, major=4, minor=0)
+        end
     else
         error("Plotting is only supported for 1D and 2D problems.")
     end
 end
 
-function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, dirpath, filename, xticks=nothing, yticks=nothing) where N
+function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, dirpath, filename; axis=true, xticks=nothing, yticks=nothing) where N
     filepath = _save_setup(dirpath, filename)
     width = 1000
     height = @match N begin
@@ -221,13 +225,13 @@ function save_drawing(X_0::IntervalBox{N, <:Real}, inn, out, delta, dirpath, fil
     end
     buffer = 50
     Drawing(width + 2*buffer, height + 2*buffer, filepath)
-    luxor_draw(X_0, inn, out, delta, width, height, buffer, xticks, yticks)
+    luxor_draw(X_0, inn, out, delta, width, height, buffer, axis=axis, xticks=xticks, yticks=yticks)
     finish()
     println("The result was saved in $(relpath(filepath, pwd())).")
 end
 
-save_drawing(X_0::AbstractVector{IntervalArithmetic.Interval{T}}, inn, out, delta, dirpath, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, dirpath, filename, xticks, yticks)
-save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, dirpath, filename, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, dirpath, filename, xticks, yticks)
+save_drawing(X_0::AbstractVector{IntervalArithmetic.Interval{T}}, inn, out, delta, dirpath, filename; axis=true, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, dirpath, filename; axis, xticks, yticks)
+save_drawing(X_0::IntervalArithmetic.Interval{T}, inn, out, delta, dirpath, filename; axis=true, xticks=nothing, yticks=nothing) where T <: Real = save_drawing(IntervalBox(X_0), inn, out, delta, dirpath, filename; axis, xticks, yticks)
 
 # Logging
 
@@ -236,12 +240,12 @@ function write_timing(io, timing)
     println(io, timing)
 end
 
-pretty_round(value) = value < 1e6 ? round(value, digits=3) : round(value, sigdigits=3)
+_pretty_round(value) = value < 1e6 ? round(value, digits=3) : round(value, sigdigits=3)
 
 function write_volumes(io, inn, out, delta, scale)
-    println(io, "Volume of boxes in inn: $(pretty_round(volume_boxes(inn, scale)))")
-    println(io, "Volume of boxes in out: $(pretty_round(volume_boxes(out, scale)))")
-    println(io, "Volume of boxes in delta: $(pretty_round(volume_boxes(delta, scale)))")
+    println(io, "Volume of boxes in inn: $(_pretty_round(volume_boxes(inn, scale)))")
+    println(io, "Volume of boxes in out: $(_pretty_round(volume_boxes(out, scale)))")
+    println(io, "Volume of boxes in delta: $(_pretty_round(volume_boxes(delta, scale)))")
 end
 
 function write_ratio(io, X_0, delta)

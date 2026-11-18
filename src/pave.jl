@@ -338,7 +338,7 @@ function expand_intervals(intervals::Vector{IntervalArithmetic.Interval{T}}, ran
 end
 
 function inflate(vector::AbstractVector, indices)
-    inflated = []
+    inflated = eltype(vector)[]
     for (i, item) in enumerate(vector)
         if i in indices
             push!(inflated, item)
@@ -378,7 +378,7 @@ function test_zero_not_in(M, R, positions_dict)
     end
 end
 
-function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
+function create_is_in_1(qcp::UnderapproxQuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         qvs_relaxed = get_qvs_relaxed(qcp)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; qvs_relaxed[j]; [(Exists, length(X)+length(qvs_relaxed[j])+i) for i in 1:length(get_G(qcp))]] for j in eachindex(qvs_relaxed)]
@@ -390,7 +390,7 @@ function create_is_in_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
     end
 end
 
-function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
+function create_is_in_2(qcp::OverapproxQuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; negation.(get_qvs(qcp)); [(Exists, length(X)+length(get_qvs(qcp))+i) for i in 1:length(get_G(qcp))]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -401,7 +401,7 @@ function create_is_in_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVec
     end
 end
 
-function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
+function create_is_out_1(qcp::OverapproxQuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         quantifiers = [[(Exists, i) for i in 1:length(X)]; get_qvs(qcp); [(Exists, length(X)+length(get_qvs(qcp))+i) for i in 1:length(get_G(qcp))]]
         dirty_quantifiers = quantifiedvariables2dirtyvariables(quantifiers)
@@ -412,7 +412,7 @@ function create_is_out_1(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
     end
 end
 
-function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
+function create_is_out_2(qcp::UnderapproxQuantifiedConstraintProblem, intervals::AbstractVector{IntervalArithmetic.Interval{T}})::Function where {T<:AbstractFloat}
     return function(X::IntervalArithmetic.IntervalBox{N, T}) where N
         qvs_relaxed = get_qvs_relaxed(qcp)
         quantifiers_relaxed = [[[(Forall, i) for i in 1:length(X)]; negation.(qvs_relaxed[j]); [(Exists, length(X)+length(qvs_relaxed[j])+i) for i in 1:length(get_G(qcp))]] for j in eachindex(qvs_relaxed)]
@@ -425,24 +425,21 @@ function create_is_out_2(qcp::QuantifiedConstraintProblem, intervals::AbstractVe
 end
 
 function check_is_in(X_0, P_in::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: AbstractFloat
-    @assert criterion == 1 || criterion == 2
-
     indices_forall = [i for (q, i) in get_qvs(qcp) if q == Forall] .- length(X_0)
     indices_exists = [i for (q, i) in get_qvs(qcp) if q == Exists] .- length(X_0)
 
-    indices = [1 for i in 1:length(P_in)]
+    indices = ones(Int, length(P_in))
     lengths = length.(P_in)
     is_in_union = false
     while !is_in_union && (isempty(indices_exists) || indices[indices_exists] <= lengths[indices_exists])
         is_in_intersection = true
         while is_in_intersection && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
             sub_interval = isempty(P_in) ? IntervalArithmetic.Interval{T}[] : [P_in[i][indices[i]] for i in 1:length(P_in)]
-            if criterion == 1
-                is_in = create_is_in_1(qcp, sub_interval)
-            end
-            if criterion == 2
-                is_in = create_is_in_2(qcp, sub_interval)
-            end
+            is_in = @match criterion begin
+                            1 => create_is_in_1(qcp, sub_interval)
+                            2 => create_is_in_2(qcp, sub_interval)
+                            _ => throw(ArgumentError("Criterion should either be 1 or 2."))
+                        end
             is_in_intersection &= is_in(X_0)
             if isempty(indices_forall)
                 break
@@ -465,24 +462,21 @@ check_is_in_1(X_0, P_in, qcp) = check_is_in(X_0, P_in, qcp, 1)
 check_is_in_2(X_0, P_in, qcp) = check_is_in(X_0, P_in, qcp, 2)
 
 function check_is_out(X_0, P_out::Vector{Vector{IntervalArithmetic.Interval{T}}}, qcp, criterion) where T <: AbstractFloat
-    @assert criterion == 1 || criterion == 2
-
     indices_forall = [i for (q, i) in get_qvs(qcp) if q == Forall] .- length(X_0)
     indices_exists = [i for (q, i) in get_qvs(qcp) if q == Exists] .- length(X_0)
 
-    indices = [1 for i in 1:length(P_out)]
+    indices = ones(Int, length(P_out))
     lengths = length.(P_out)
     is_out_intersection = true
     while is_out_intersection && (isempty(indices_exists) || indices[indices_exists] <= lengths[indices_exists])
         is_out_union = false
         while !is_out_union && (isempty(indices_forall) || indices[indices_forall] <= lengths[indices_forall])
             sub_interval = isempty(P_out) ? IntervalArithmetic.Interval{T}[] : [P_out[i][indices[i]] for i in 1:length(P_out)]
-            if criterion == 1
-                is_out = create_is_out_1(qcp, sub_interval)
-            end
-            if criterion == 2
-                is_out = create_is_out_2(qcp, sub_interval)
-            end
+            is_out = @match criterion begin
+                            1 => create_is_out_1(qcp, sub_interval)
+                            2 => create_is_out_2(qcp, sub_interval)
+                            _ => throw(ArgumentError("Criterion should either be 1 or 2."))
+                        end
             is_out_union |= is_out(X_0)
             increment!(indices, lengths, indices_forall)
             if isempty(indices_forall)
@@ -509,13 +503,11 @@ global z_in, z_out
 const expansion_functions_1 = (expand_1, duplication_positions_1, complement_ranges_1)
 const expansion_functions_2 = (expand_2, duplication_positions_2, complement_ranges_2)
 
-function build_quantified_problem_in(parameters::ProblemParameters, domains, criterion)
+function build_quantified_problem_in(parameters::ProblemParameters, qvs_relaxed, domains, criterion)
     expand, duplication_positions, complement_ranges = criterion == 1 ? expansion_functions_1 : expansion_functions_2 
     
     M = get_M(parameters)
     userfunctions = get_f(parameters)
-    qvs = get_qvs(parameters)
-    qvs_relaxed = get_qvs_relaxed(parameters)
     sizes = get_sizes(parameters)
     p = get_p(parameters)
     
@@ -550,20 +542,22 @@ function build_quantified_problem_in(parameters::ProblemParameters, domains, cri
         error("Unknown type of user-defined functions: $(typeof(userfunctions)).")
     end
     G_in = expand_intervals(G, complement_ranges(M, ranges_dict))
-    qvs_relaxed_in = inflate(qvs_relaxed, positions_in)
     positions_dict_in = build_positions_dict(M_in)
     problem_in = ExpandedProblem(M_in, f_fun_in, Df_fun_in, G_in, positions_dict_in)
     
-    return QuantifiedConstraintProblem(problem_in, qvs, qvs_relaxed_in)
+    if criterion == 1
+        qvs_relaxed_in = inflate(qvs_relaxed, positions_in)
+        return UnderapproxQuantifiedConstraintProblem(problem_in, qvs, qvs_relaxed_in)
+    else
+        return OverapproxQuantifiedConstraintProblem(problem_in, get_qvs(parameters))
+    end
 end
 
-function build_quantified_problem_out(parameters::ProblemParameters, domains, criterion)
+function build_quantified_problem_out(parameters::ProblemParameters, qvs_relaxed, domains, criterion)
     expand, duplication_positions, complement_ranges = criterion == 1 ? expansion_functions_1 : expansion_functions_2 
     
     M = get_M(parameters)
     userfunctions = get_f(parameters)
-    qvs = get_qvs(parameters)
-    qvs_relaxed = get_qvs_relaxed(parameters)
     sizes = get_sizes(parameters)
     p = get_p(parameters)
     
@@ -598,11 +592,15 @@ function build_quantified_problem_out(parameters::ProblemParameters, domains, cr
         error("Unknown type of user-defined functions: $(typeof(userfunctions)).")
     end
     G_out = expand_intervals(G, complement_ranges(M, ranges_dict))
-    qvs_relaxed_out = inflate(qvs_relaxed, positions_out)
     positions_dict_out = build_positions_dict(M_out)
     problem_out = ExpandedProblem(M_out, f_fun_out, Df_fun_out, G_out, positions_dict_out)
     
-    return QuantifiedConstraintProblem(problem_out, qvs, qvs_relaxed_out)
+    if criterion == 1
+        return OverapproxQuantifiedConstraintProblem(problem_out, get_qvs(parameters))
+    else
+        qvs_relaxed_out = inflate(qvs_relaxed, positions_out)
+        return UnderapproxQuantifiedConstraintProblem(problem_out, qvs, qvs_relaxed_out)
+    end
 end
 
 struct PavingConfiguration{T <: AbstractFloat}
@@ -648,27 +646,35 @@ function Base.show(io::IO, configuration::PavingConfiguration)
     print(io, if configuration.allow_exists_or_forall_bisection "Normal bisection on P" else "No standard bisection on P" end)
 end
 
-function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, configuration, criterion_in, criterion_out, verbose=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:AbstractFloat}
+function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, qvs_relaxed, domains, configuration, criterion_in, criterion_out, verbose=true)::Tuple{Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}, Vector{IntervalArithmetic.IntervalBox{N, T}}} where {N, T<:AbstractFloat}
     X_length = length(X)
     P_length = length(get_P(domains))
     @assert X_length + P_length == get_p(parameters) "Total number of variables, in X and P, must be equal to p = $(get_p(parameters))."
-    @assert length(get_qvs(parameters)) == P_length "Number of quantified variables must be equal to the number of parameter."
-    for qv in get_qvs(parameters)
+    @assert length(qvs) == P_length "Number of quantified variables must be equal to the number of parameter."
+    for qv in qvs
         @assert X_length < index(qv) <= X_length + P_length "Quantified variables must be in the parameter space: indices between $(X_length+1) and $(X_length+P_length))."
     end
-    for qvs in get_qvs_relaxed(parameters)
+    for qvs in qvs_relaxed
         @assert length(qvs) == length(get_P(domains)) "Number of quantified variables must be equal to the number of parameter boxes, $(P_length)."
         for qv in qvs
             @assert X_length < index(qv) <= X_length + P_length "Quantified variables must be in the parameter space: indices between $(X_length+1) and $(X_length+P_length)."
         end
     end
-    check_is_in = criterion_in == 1 ? check_is_in_1 : check_is_in_2
-    check_is_out = criterion_out == 1 ? check_is_out_1 : check_is_out_2
+    check_is_in = @match criterion_in begin
+        1 => check_is_in_1
+        2 => check_is_in_2
+        _ => throw(ArgumentError("criterion_in should either be 1 or 2."))
+    end
+    check_is_out = @match criterion_out begin
+        1 => check_is_out_1
+        2 => check_is_out_2
+        _ => throw(ArgumentError("criterion_out should either be 1 or 2."))
+    end
     
     p = get_p(parameters)
     
-    qcp_in = build_quantified_problem_in(parameters, domains, criterion_in)
-    qcp_out = build_quantified_problem_out(parameters, domains, criterion_out)
+    qcp_in = build_quantified_problem_in(parameters, qvs_relaxed, domains, criterion_in)
+    qcp_out = build_quantified_problem_out(parameters, qvs_relaxed, domains, criterion_out)
     
     P = get_P(domains)
     P_in = [[interval] for interval in P]
@@ -813,13 +819,13 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, domains, conf
     return inn, out, delta
 end
 
-pave(X::AbstractVector{IntervalArithmetic.Interval{T}}, parameters, domains, configuration, verbose=true) where T <: AbstractFloat = pave(IntervalBox(X), parameters, domains, configuration, verbose)
-pave(X::IntervalArithmetic.Interval{T}, parameters, domains, configuration, verbose=true) where T <: AbstractFloat = pave([X], parameters, domains, configuration, verbose)
+pave(X::AbstractVector{IntervalArithmetic.Interval{T}}, parameters, qvs, qvs_relaxed, domains, configuration, verbose=true) where T <: AbstractFloat = pave(IntervalBox(X), parameters, qvs, qvs_relaxed, domains, configuration, verbose)
+pave(X::IntervalArithmetic.Interval{T}, parameters, qvs, qvs_relaxed, domains, configuration, verbose=true) where T <: AbstractFloat = pave([X], parameters, qvs, qvs_relaxed, domains, configuration, verbose)
 
-pave_11(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 1, verbose)
-pave_12(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 1, 2, verbose)
-pave_21(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 2, 1, verbose)
-pave_22(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, domains, configuration, 2, 2, verbose)
+pave_11(X, parameters, qvs_relaxed, domains, configuration, verbose=true) = pave(X, parameters, qvs_relaxed, domains, configuration, 1, 1, verbose)
+pave_12(X, parameters, qvs_relaxed, domains, configuration, verbose=true) = pave(X, parameters, qvs_relaxed, domains, configuration, 1, 2, verbose)
+pave_21(X, parameters, domains, configuration, verbose=true) = pave(X, parameters, [], domains, configuration, 2, 1, verbose)
+pave_22(X, parameters, qvs_relaxed, domains, configuration, verbose=true) = pave(X, parameters, qvs_relaxed, domains, configuration, 2, 2, verbose)
 
 pave(X, parameters, domains, configuration, verbose=true) = pave_21(X, parameters, domains, configuration, verbose)
 

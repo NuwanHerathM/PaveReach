@@ -2,7 +2,7 @@ include("../src/PaveReach.jl")
 
 using BenchmarkTools
 
-# Load the neural netword
+# Load the neural network
 
 modelpath = joinpath(@__DIR__, "models/running_example.nnet")
 nnet = read_nnet(modelpath; last_layer_activation = NeuralVerification.ReLU())
@@ -18,8 +18,8 @@ dN(i, x::Tuple) = dN(i, collect(x))
 confidence(vect::AbstractVector) = vect[1] - vect[2]
 confidence(mat::Matrix) = mat[1, :] - mat[2, :]
 
-input_x = 0.2
-input_y = -1.1
+input_x = 0.5
+input_y = -0.35
 input = [input_x, input_y]
 
 function perturbation(x)
@@ -32,7 +32,7 @@ function gradient_perturbation(x)
 end
 
 # Set the problem
-# λ ∣ ∀ ϵ ∈ [-0.5, 0.5]², confidence(N(0.2 + ϵ_1, -1.1 + ϵ_2)) > 0
+# λ ∣ ∀ ϵ ∈ [-0.5, 0.5]², confidence(N(0.5 + ϵ_1, -0.35 + ϵ_2)) > 0
 
 p = 3
 f_fun = Function[(x...) -> confidence(N(perturbation(x[1:3])))]
@@ -42,8 +42,7 @@ Df_fun = ColJacobianMatrix([(x...) -> [confidence(DN(perturbation(x[1:3])) * [x[
 sizes = [1]
 formula = parseformula("P_1")
 qvs = [(Forall, 2), (Forall, 3)]
-qvs_relaxed = [qvs]
-parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
+parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, p)
 X_0 = IntervalBox(interval(0, 1))
 ϵ_max = 0.5
 P = [interval(-ϵ_max, ϵ_max), interval(-ϵ_max, ϵ_max)]
@@ -59,7 +58,8 @@ configuration = PavingConfiguration(ϵ_x, ϵ_p, allow_exists_or_forall_bisection
 # Pave
 
 verbose = false
-benchmark = @benchmarkable (global inn, out, delta = pave_12(X_0, parameters, domains, configuration, verbose)) samples=1 evals=1
+qvs_relaxed = [qvs]
+benchmark = @benchmarkable (global inn, out, delta = pave_12(X_0, parameters, qvs_relaxed, domains, configuration, verbose)) samples=1 evals=1
 results = run(benchmark)
 timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milliseconds
 
@@ -67,6 +67,7 @@ timing = round(median(results).time/1e6, digits=3) # time/1e6 -> timing in milli
 
 filename = splitext(basename(PROGRAM_FILE))[1]
 base = "$(filename)_$(input_x)_$(input_y)_$(ϵ_x)_$(ϵ_p)_refined"
+
 outfile = base * ".png"
 save_drawing(X_0, inn, out, delta, @__DIR__, outfile)
 

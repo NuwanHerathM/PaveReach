@@ -3,7 +3,7 @@
 Paving of a set describing a quantified constraint problem, using general reachability.
 
 <p align="center">
-  <img src="images/ex_5-4_circle_collision_11_0.1_0.1_refined.png" width="300">
+  <img src="images/ex_5-4_circle_collision_11_[0.1, 0.1]_[0.1]_refined.png" width="300">
 </p>
 
 ## Gist of the program
@@ -21,29 +21,6 @@ For a quantified set $\Sigma$, the paving function `pave` returns
 
 For the different paving functions, see [Oracles](#oracles).
 
-## Producing experimental results with a Docker image
-
-We provide scripts to run experiments present in `examples/`.
-
-### Requirement
-
-Make sure that you have
-[Docker](https://docs.docker.com/get-started/) installed and running.
-
-### Building the Docker image
-
-Get in the root directory, where you can find the `Dockerfile` and `Makefile` files. Run the `make` command in order to decompress the models present in `examples/models/`, to build the image that will be named `pavereach` and to change the mode of the scripts to execute.
-```
-make
-```
-
-### Running experiments
-
-Scripts are provided in `.sh` files. Simply run
-```
-./<filename>.sh
-```
-
 ## Using the prototype
 ### Dependencies
 
@@ -57,7 +34,6 @@ For `GenReach`
 * `Symbolics` v6.31.0
 
 For `PaveReach`
-* `ArgParse` v1.2.0
 * `BenchmarkTools` v1.8.0
 * `Luxor` v4.3.0
 * `Match` v2.4.1
@@ -88,7 +64,7 @@ pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 Or add all the packages at once.
 ```julia
-pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Symbolics @6.31.0 ArgParse @1.2.0 BenchmarkTools @1.8.0 Luxor @4.3.0 Match @2.4.1 ONNX @0.3.0 ReusePatterns @0.3.1 StaticArrays @1.9.24 SoleLogics @0.13.7 ProtoBuf @1.2.3
+pkg> add IntervalArithmetic @0.21.2 LazySets @2.14.2 Symbolics @6.31.0 BenchmarkTools @1.8.0 Luxor @4.3.0 Match @2.4.1 ONNX @0.3.0 ReusePatterns @0.3.1 StaticArrays @1.9.24 SoleLogics @0.13.7 ProtoBuf @1.2.3
 pkg> add https://github.com/sisl/NeuralVerification.jl
 ```
 To return to the `julia>` prompt, either press backspace when the input line is empty or press `Ctrl+C`.
@@ -139,6 +115,16 @@ Run:
 ```
 julia ex_0-2_star.jl
 ```
+
+#### Local robustness of a neural network
+
+Move into the `examples/` folder.
+
+Run:
+```
+julia ex_0-3_network_local_robustness.jl
+```
+
 
 <!-- #### Try a 2D toy example
 
@@ -268,18 +254,14 @@ formula = ...
 sizes = ...
 # Quantified variables
 qvs = ...
-# Relaxed quantified variables
-qvs_relaxed_1 = ...
-...
-qvs_relaxed_m = ...
 # Problem parameters
-parameters = ProblemParameters(formula, x, f_num, sizes, qvs, [qvs_relaxed_1, ..., qvs_relaxed_m], p)
+parameters = ProblemParameters(formula, x, f_num, sizes, qvs, p)
 # Problem domains
 P = ...
 G = ...
 domains = ProblemDomains(P, G)
 ```
-See the examples and [Problem parameters](#problem-parameters) for further details.
+See the examples, [Problem parameters](#problem-parameters) and [Problem domains](#problem-domains) for further details.
 
 Paving discretization has to be configured.
 ```julia
@@ -289,15 +271,6 @@ allow_exists_or_forall_bisection = true | false
 allow_exists_and_forall_bisection = true | false
 configuration = PavingConfiguration(ϵ_x, ϵ_p, allow_exists_or_forall_bisection, allow_exists_and_forall_bisection)
 ```
-
-#### For a scalar-valued function
-
-For scalar-valued functions, one simply needs to do
-```julia
-# Problem parameters
-parameters = ProblemParameters(formula, x, f_num, sizes, qvs, [qvs], p)
-```
-In this case, `qvs` is just repeated between `[` and `]`.
 
 #### Quantified variables
 
@@ -311,9 +284,9 @@ In the definition of the problem, the first quantified variables are reserved fo
 
 For example, let us take a look at the following problem:
 <!-- in `ex_5-4_circle_collision.jl` the problem is -->
-$$\\{(x, y) \in [-5, 5]^2 \mid \forall t \in [-\pi, \pi],(2.5*sin(t) - x)^2 + (2.5*cos(t) - y)^2 \in [0.25, +\infty]\\}$$
+$$\\{(x, y) \in [-5, 5]^2 \mid \forall t \in [-\pi, \pi], (2.5*\sin(t) - x)^2 + (2.5*\cos(t) - y)^2 \in [0.25, +\infty]\\}$$
 
-Even though the total number of variable is `p=3`, one only has to specify the quantifier for the third variable
+Even though the total number of variable is `p=3`, one only has to specify the quantifier for the third variable.
 ```julia
 # x[1] := x, x[2] := y, x[3] := t
 qvs = [(Forall, 3)]
@@ -323,7 +296,7 @@ The first two variables correspond to the free variables, $x$ and $y$, of the 2D
 
 ### Oracles
 
-Select one of the four paving functions according to this table
+Select one of the four paving functions according to this table.
 
 |   | $\mathcal{O}^{OUT}$ using $\mathbb{P}$ and $M^\top$ | $\mathcal{O}^{OUT}$ using $\neg\mathbb{P}$ and $M^\bot$
 |---|---|---
@@ -333,7 +306,7 @@ Select one of the four paving functions according to this table
 > [!NOTE]
 > The user does not have to construct $\neg\mathbb{P}$ or $\neg M$. The four paving functions take $\mathbb{P}$ and $M$ as input, so swapping between the functions amounts only to changing the name of the function.
 
-The oracles rely on the computation of a reachable set. The implementation uses the inner and outer approximations. Inner approximation requires quantifier relaxation. If you are unfamiliar with this, use the default `pave` (alias for `pave_21`) and for the relaxed quantifiers, repeat the original quantifiers as in `examples/ex_0-1_star.jl`.
+The oracles rely on the computation of a reachable set. The implementation uses the inner and outer approximations. Inner approximation requires quantifier relaxation. If you are unfamiliar with this, use the default `pave` (alias for `pave_21`).
 
 ## Symbolic expression of the functions
 
@@ -404,30 +377,28 @@ $$M(x, p) := P(x, p) \mid M(x, p) \wedge M(x, p) \mid M(x, p) \vee M(x, p) \mid 
 
 ### Problem parameters
 
-We assume that the user knows how to use relaxed quantifiers for the computation of an inner reachable set. The unfamiliar user is invited to refer to [Oracles](#oracles) and use `pave_21`.
-
 There are three ways to define the parameters of the problem.
 * When there is only one predicate and you have the symbolic expression of the functions:
-`ProblemParameters` takes the variables `variables`, the symbolic expression of the functions `f_num`, the quantifiers `qvs` for the bounded variables, the relaxed variables `qvs_relaxed` and the number of variables `p`.
+`ProblemParameters` takes the variables `variables`, the symbolic expression of the functions `f_num`, the quantifiers `qvs` for the bounded variables and the number of variables `p`.
 ```julia
-ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+ProblemParameters(variables::AbstractVector{Num}, f_num::Vector{Num}, qvs::Vector{QuantifiedVariable}, p::Int)
 ```
 * When you have the symbolic expressions of the functions:
-`ProblemParameters` takes the formula `M`, the variables `variables`, the symbolic expression of the functions `f_num`, the dimensions of the codomains `sizes`, the quantifiers `qvs` for the bounded variables, the relaxed variables `qvs_relaxed` and the number of variables `p`.
+`ProblemParameters` takes the formula `M`, the variables `variables`, the symbolic expression of the functions `f_num`, the dimensions of the codomains `sizes`, the quantifiers `qvs` for the bounded variables and the number of variables `p`.
 ```julia
-ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+ProblemParameters(M::SyntaxTree, variables::AbstractVector{Num}, f_num::Vector{Num}, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, p::Int)
 ```
 * When you have the functions and their gradients:
-`ProblemParameters` takes the formula `M`, the functions `f`, the Jacobian `Df`, the dimensions of the codomains `sizes`, the quantifiers `qvs` for the bounded variables, the relaxed variables `qvs_relaxed` and the number of variables `p`.
+`ProblemParameters` takes the formula `M`, the functions `f`, the Jacobian `Df`, the dimensions of the codomains `sizes`, the quantifiers `qvs` for the bounded variables and the number of variables `p`.
 ```julia
-ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, qvs_relaxed::Vector{Vector{QuantifiedVariable}}, p::Int)
+ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes::Vector{Int}, qvs::Vector{QuantifiedVariable}, p::Int)
 ```
 
 ### Problem domains
 
 `ProblemDomains` takes the parameter domain $\mathbb{P}$ and the target domain $\mathbb{G}$.
 ```julia
-ProblemDomains(P::Vector{IntervalArithmetic.Interval{T}}, G::Vector{IntervalArithmetic.Interval{T}})
+ProblemDomains(P::Vector{IntervalArithmetic.Interval{<:AbstractFloat}}, G::Vector{IntervalArithmetic.Interval{<:AbstractFloat}})
 ```
 
 ## Formula
@@ -441,29 +412,42 @@ The `Precision` type refers to a number or a vector of numbers.
 
 No parameter subdivision:
 ```julia
-PavingConfiguration(ϵ_x::Precision)
-PavingConfiguration(ϵ_x::Precision, nothing, false, false)
+PavingConfiguration(ϵ_x<:AbstractFloat)
+PavingConfiguration(ϵ_x::Vector{<:AbstractFloat})
+PavingConfiguration(ϵ_x::Vector{<:AbstractFloat}, [], false, false)
 ```
 Subdivision:
 ```julia
-PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, true, false)
+PavingConfiguration(ϵ_x<:AbstractFloat, ϵ_p::Vector{<:AbstractFloat}, true, false)
+PavingConfiguration(ϵ_x::Vector{<:AbstractFloat}, ϵ_p<:AbstractFloat, true, false)
+PavingConfiguration(ϵ_x::Vector{<:AbstractFloat}, ϵ_p::Vector{<:AbstractFloat}, true, false)
 ```
 Points/subdivision:
 ```julia
-PavingConfiguration(ϵ_x::Precision, ϵ_p::Precision, false, true)
+PavingConfiguration(ϵ_x<:AbstractFloat, ϵ_p::Vector{<:AbstractFloat}, false, true)
+PavingConfiguration(ϵ_x::Vector{<:AbstractFloat}, ϵ_p<:AbstractFloat, false, true)
+PavingConfiguration(ϵ_x::Vector{<:AbstractFloat}, ϵ_p::Vector{<:AbstractFloat}, false, true)
 ```
 
 ## Paving
 
-Use one of the paving functions presented in [Oracles](#oracles) or the default function `pave`.
+Use one of the paving functions presented in [Oracles](#oracles). The unfamiliar user is invited to refer to [Oracles](#oracles) or use the default function `pave`.
 ```julia
 pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters::ProblemParameters, domains::ProblemDomains, configuration::PavingConfiguration)
 pave(X::IntervalArithmetic.Interval{T}, parameters::ProblemParameters, domains::ProblemDomains, configuration::PavingConfiguration)
 ```
-By default, verbosity is turned on: the number of iterations and the number of evaluations is displayed.
+By default, verbosity is turned on: the paving domain, the number of iterations and the number of evaluations is displayed.
 To turn it off:
 ```julia
 pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters::ProblemParameters, domains::ProblemDomains, configuration::PavingConfiguration, verbose=false)
+```
+
+If you do not use the default function, the relaxation for the inner approximation is required. We assume that the user knows how to use relaxed quantifiers for the computation of an inner reachable set.
+```julia
+qvs_relaxed_1 = ...
+...
+qvs_relaxed_m = ...
+pave_11(X, parameters, [qvs_relaxed_1, ..., qvs_relaxed_m], domains, configuration)
 ```
 
 ## Saving the output
@@ -474,8 +458,13 @@ outfile = ...
 save_drawing(X_0, inn, out, delta, dirpath, filename)
 ```
 
-By default, x ticks and y ticks are deduced from `X_0`. If `X_0` is the result of a linear scaling, the initial ticks can be set.
+By default, x ticks and y ticks are deduced from `X_0`. If `X_0` is the result of a linear scaling, the original ticks can be set by specifying starting and ending values.
 ```julia
-save_drawing(X_0, inn, out, delta, dirpath, filename, xticks=(x_start, x_end))
-save_drawing(X_0, inn, out, delta, dirpath, filename, xticks=(x_start, x_end), yticks=(y_start, y_end))
+save_drawing(X_0, inn, out, delta, dirpath, filename; xticks=(x_start, x_end))
+save_drawing(X_0, inn, out, delta, dirpath, filename; xticks=(x_start, x_end), yticks=(y_start, y_end))
+```
+
+Axes can be hidden.
+```julia
+save_drawing(X_0, inn, out, delta, dirpath, filename; axis=false)
 ```

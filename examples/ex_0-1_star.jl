@@ -12,10 +12,8 @@ f_num = [(x[1] + 1)^2 + x[2]^2,                                                 
     x[1]^2 + (x[2] - 1)^2]                                                                      # f_4(x, y) = x^2 + (y - 1)^2
 sizes = [2, 2]                                                                                  # P_1 <- (f_1, f_2), P_2 <- (f_3, f_4)
 formula = parseformula("P_1 ∨ P_2")
-qvs = QuantifiedVariable[]                                                                      # No quantified variables in this example
-qvs_relaxed = [qvs, qvs, qvs, qvs]
-# 
-parameters = ProblemParameters(formula, x, f_num, sizes, qvs, qvs_relaxed, p)
+qvs = []                                                                                        # No quantified variables in this example
+parameters = ProblemParameters(formula, x, f_num, sizes, qvs, p)
 X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))                                             # X_0 = [-5, 5] x [-5, 5]
 P = IntervalArithmetic.Interval{Float64}[]                                                      # No parameters in this example
 G = [interval(minus_inf, 4),                                                                    # f_1(x, y) <= 4 that is f_1(x, y) ∈ (-∞, 4]

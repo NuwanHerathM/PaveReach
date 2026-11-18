@@ -15,10 +15,8 @@ Df_fun = MatJacobianMatrix([(x...) -> 2*(x[1] + 1) (x...) -> 2*x[2];
         (x...) -> 2*x[1] (x...) -> 2*(x[2] - 1)])
 sizes = [2, 2]
 formula = parseformula("P_1 ∨ P_2")
-qvs = QuantifiedVariable[]
-qvs_relaxed = [qvs, qvs, qvs, qvs]
-# 
-parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, qvs_relaxed, p)
+qvs = []
+parameters = ProblemParameters(formula, f_fun, Df_fun, sizes, qvs, p)
 X_0 = IntervalBox(interval(-5, 5), interval(-5, 5))                                             # X_0 = [-5, 5] x [-5, 5]
 P = IntervalArithmetic.Interval{Float64}[]                                                      # No parameters in this example
 G = [interval(minus_inf, 4),                                                                    # f_1(x, y) <= 4 that is f_1(x, y) ∈ (-∞, 4]
