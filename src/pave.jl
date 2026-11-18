@@ -819,8 +819,8 @@ function pave(X::IntervalArithmetic.IntervalBox{N, T}, parameters, qvs_relaxed, 
     return inn, out, delta
 end
 
-pave(X::AbstractVector{IntervalArithmetic.Interval{T}}, parameters, qvs, qvs_relaxed, domains, configuration, verbose=true) where T <: AbstractFloat = pave(IntervalBox(X), parameters, qvs, qvs_relaxed, domains, configuration, verbose)
-pave(X::IntervalArithmetic.Interval{T}, parameters, qvs, qvs_relaxed, domains, configuration, verbose=true) where T <: AbstractFloat = pave([X], parameters, qvs, qvs_relaxed, domains, configuration, verbose)
+pave(X::AbstractVector{IntervalArithmetic.Interval{T}}, parameters, qvs_relaxed, domains, configuration, criterion_in, criterion_out, verbose=true) where T <: AbstractFloat = pave(IntervalBox(X), parameters, qvs_relaxed, domains, configuration, criterion_in, criterion_out, verbose)
+pave(X::IntervalArithmetic.Interval{T}, parameters, qvs_relaxed, domains, configuration, criterion_in, criterion_out, verbose=true) where T <: AbstractFloat = pave([X], parameters, qvs_relaxed, domains, configuration, criterion_in, criterion_out, verbose)
 
 pave_11(X, parameters, qvs_relaxed, domains, configuration, verbose=true) = pave(X, parameters, qvs_relaxed, domains, configuration, 1, 1, verbose)
 pave_12(X, parameters, qvs_relaxed, domains, configuration, verbose=true) = pave(X, parameters, qvs_relaxed, domains, configuration, 1, 2, verbose)
