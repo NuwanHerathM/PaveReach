@@ -401,6 +401,18 @@ ProblemParameters(M::SyntaxTree, f::Vector{Function}, Df::JacobianMatrix, sizes:
 ProblemDomains(P::Vector{IntervalArithmetic.Interval{<:AbstractFloat}}, G::Vector{IntervalArithmetic.Interval{<:AbstractFloat}})
 ```
 
+### Global Constants
+
+- `minus_inf`: Set to `-100000`, this constant represents negative infinity.
+- `plus_inf`: Set to `100000`, this constant represents positive infinity.
+- `strict_epsilon`: Set to `0.0001`, this small positive value is used to represent strict inequalities .
+
+For $f_1(x,p) \leq 0 \wedge f_2(x,p) > 5$, one could define $\mathbb{G} = (-\infty, 0] \times (5, \infty)$ as follows.
+```julia
+G = [interval(minus_inf, 0),
+    interval(5 + strict_epsilon, plus_inf)]
+```
+
 ## Formula
 
 > [!NOTE]
